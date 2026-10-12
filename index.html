@@ -1,0 +1,2839 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Lord Erebus — Lucky Wheel</title>
+  <meta name="description" content="Live giveaway lucky wheel with local SQLite database, client-side draws, and admin dashboard. Zero setup needed for Vercel.">
+  <meta name="theme-color" content="#07070a">
+  <link rel="icon" type="image/jpeg" href="assets/logo.jpg">
+  <link rel="apple-touch-icon" href="assets/logo.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Teko:wght@500;600;700&display=swap" rel="stylesheet">
+  <!-- SQLite in WebAssembly via sql.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.12.0/sql-wasm.js"></script>
+  <style>
+    :root {
+      --bg: #07070a;
+      --bg-2: #0d0d12;
+      --surface: rgba(22, 20, 28, 0.72);
+      --surface-solid: #14131a;
+      --surface-2: #1c1a24;
+      --line: rgba(255, 255, 255, 0.08);
+      --line-strong: rgba(255, 255, 255, 0.14);
+      --text: #f4f2f7;
+      --muted: #9b97a8;
+      --faint: #6b6778;
+      --red: #ff1f3d;
+      --red-deep: #a10f25;
+      --red-glow: rgba(255, 31, 61, 0.45);
+      --violet: #b03cff;
+      --gold: #ffcf5a;
+      --ok: #2fd47c;
+      --warn: #ffb547;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+      --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      --display: 'Teko', 'Bebas Neue', 'Oswald', Impact, sans-serif;
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: clip;
+      min-height: 100vh;
+      position: relative;
+    }
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: -1;
+      background:
+        radial-gradient(900px 600px at 15% -10%, rgba(255, 31, 61, 0.16), transparent 60%),
+        radial-gradient(700px 500px at 100% 110%, rgba(176, 60, 255, 0.12), transparent 60%),
+        var(--bg);
+      pointer-events: none;
+    }
+    a { color: inherit; text-decoration: none; }
+    button, input, select, textarea { font: inherit; color: inherit; }
+    [hidden] { display: none !important; }
+
+    /* Primitives */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+    .pad { padding: 22px; }
+    .eyebrow {
+      font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); font-weight: 600;
+    }
+    .display { font-family: var(--display); font-weight: 600; letter-spacing: 0.02em; line-height: 0.95; }
+    .muted { color: var(--muted); }
+    .faint { color: var(--faint); }
+    .mono { font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; font-size: 0.92em; }
+    .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .spacer { flex: 1; }
+    .stack { display: grid; gap: 14px; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      height: 42px; padding: 0 18px; border-radius: 12px;
+      border: 1px solid var(--line-strong); background: var(--surface-2);
+      font-weight: 600; font-size: 14px; cursor: pointer; white-space: nowrap;
+      transition: transform .15s ease, background .2s ease, border-color .2s ease, box-shadow .2s ease, opacity .2s;
+    }
+    .btn:hover { border-color: rgba(255, 255, 255, 0.25); background: #24212e; }
+    .btn:active { transform: translateY(1px) scale(0.99); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+    .btn.primary {
+      background: linear-gradient(180deg, #ff3550, #d4102b); border-color: transparent;
+      box-shadow: 0 8px 24px var(--red-glow), inset 0 1px 0 rgba(255,255,255,.25);
+      color: #fff;
+    }
+    .btn.primary:hover { background: linear-gradient(180deg, #ff4a62, #e01431); }
+    .btn.ghost { background: transparent; }
+    .btn.danger { color: #ff6b80; border-color: rgba(255, 31, 61, 0.35); background: rgba(255, 31, 61, 0.08); }
+    .btn.danger:hover { background: rgba(255, 31, 61, 0.18); }
+    .btn.sm { height: 34px; padding: 0 12px; font-size: 13px; border-radius: 10px; }
+    .btn.lg { height: 56px; padding: 0 34px; font-size: 18px; border-radius: 16px; letter-spacing: 0.04em; }
+
+    .field { display: grid; gap: 6px; }
+    .field > span { font-size: 12.5px; color: var(--muted); font-weight: 500; }
+    .input, select.input, textarea.input {
+      width: 100%; height: 42px; padding: 0 14px; border-radius: 11px;
+      background: rgba(0, 0, 0, 0.35); border: 1px solid var(--line-strong); outline: none;
+      transition: border-color .2s, box-shadow .2s; color: var(--text);
+    }
+    textarea.input { height: auto; min-height: 100px; padding: 12px 14px; resize: vertical; line-height: 1.5; }
+    .input:focus { border-color: rgba(255, 31, 61, 0.7); box-shadow: 0 0 0 4px rgba(255, 31, 61, 0.15); }
+    .hint { font-size: 12px; color: var(--faint); margin: 0; }
+
+    .switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+    .switch input { position: absolute; opacity: 0; pointer-events: none; }
+    .switch .track {
+      width: 42px; height: 24px; border-radius: 99px; background: #2a2833; position: relative; transition: background .2s; flex: none;
+    }
+    .switch .track::after {
+      content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%;
+      background: #fff; transition: transform .2s cubic-bezier(.3,1.4,.5,1);
+    }
+    .switch input:checked + .track { background: var(--red); }
+    .switch input:checked + .track::after { transform: translateX(18px); }
+    .switch input:focus-visible + .track { box-shadow: 0 0 0 3px rgba(255,31,61,.35); }
+
+    .seg { display: inline-flex; padding: 4px; border-radius: 12px; background: rgba(0,0,0,.35); border: 1px solid var(--line); gap: 4px; flex-wrap: wrap; }
+    .seg button { border: 0; background: transparent; padding: 8px 14px; border-radius: 9px; cursor: pointer; color: var(--muted); font-weight: 600; font-size: 13px; }
+    .seg button[aria-pressed="true"] { background: var(--surface-2); color: var(--text); box-shadow: 0 2px 10px rgba(0,0,0,.4); }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 99px;
+      font-size: 11.5px; font-weight: 600; letter-spacing: .02em; border: 1px solid var(--line-strong); color: var(--muted); white-space: nowrap;
+    }
+    .badge.red { color: #ff8193; border-color: rgba(255,31,61,.4); background: rgba(255,31,61,.1); }
+    .badge.violet { color: #d39bff; border-color: rgba(176,60,255,.45); background: rgba(176,60,255,.12); }
+    .badge.green { color: #6ff0a8; border-color: rgba(47,212,124,.4); background: rgba(47,212,124,.1); }
+    .badge.gold { color: var(--gold); border-color: rgba(255,207,90,.4); background: rgba(255,207,90,.08); }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    .dot.live { animation: pulse 1.6s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .3 } }
+
+    .table-wrap { overflow-x: auto; border-radius: var(--radius-sm); border: 1px solid var(--line); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    th { font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); font-weight: 600; background: rgba(0,0,0,.25); position: sticky; top: 0; }
+    tr:last-child td { border-bottom: 0; }
+    tbody tr:hover { background: rgba(255,255,255,.02); }
+    .empty { padding: 34px; text-align: center; color: var(--faint); }
+
+    /* Top bar */
+    .topbar {
+      position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px;
+      padding: 12px max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right));
+      background: rgba(7,7,10,.75); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--line);
+    }
+    .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; cursor: pointer; }
+    .brand-logo-wrap {
+      width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--red); box-shadow: 0 0 16px var(--red-glow);
+      display: grid; place-items: center; overflow: hidden; background: #0a0709;
+    }
+    .brand-logo-wrap img { width: 100%; height: 100%; object-fit: cover; }
+    .brand-logo-wrap svg { width: 24px; height: 24px; }
+    .brand span { font-size: 26px; letter-spacing: .06em; font-family: var(--display); line-height: 1; }
+    .brand em { font-style: normal; color: var(--red); text-shadow: 0 0 18px var(--red-glow); }
+    .icon-btn { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 11px; border: 1px solid var(--line-strong); background: transparent; cursor: pointer; color: var(--muted); }
+    .icon-btn:hover { color: var(--text); border-color: var(--text); }
+    .icon-btn .mute { display: none; }
+    .icon-btn[aria-pressed="false"] .mute { display: inline; }
+    .icon-btn[aria-pressed="false"] .wave { display: none; }
+
+    /* Hero */
+    .hero { position: relative; overflow: hidden; padding: 48px 16px 28px; text-align: center; }
+    .hero-bg {
+      position: absolute; inset: 0; z-index: -1;
+      background: radial-gradient(circle at 50% 30%, rgba(255,31,61,0.22), transparent 70%);
+      opacity: .6;
+    }
+    .hero-banner-img {
+      position: absolute; inset: 0; z-index: -2; opacity: 0.18; object-fit: cover; width: 100%; height: 100%;
+      mask-image: linear-gradient(180deg, #000 30%, transparent); -webkit-mask-image: linear-gradient(180deg, #000 30%, transparent);
+    }
+    .hero-inner { max-width: 760px; margin: 0 auto; display: grid; gap: 10px; justify-items: center; }
+    .hero h1 { margin: 6px 0 0; font-size: clamp(44px, 9vw, 86px); text-transform: uppercase; text-shadow: 0 0 40px rgba(255,31,61,.35); }
+    .hero p { margin: 0; font-size: 16px; }
+
+    /* Stage Layout */
+    .stage-grid {
+      max-width: 1180px; margin: 0 auto; padding: 8px 16px 40px;
+      display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, 1fr); gap: 28px; align-items: start;
+    }
+    .wheel-col { display: grid; gap: 22px; padding-top: 14px; }
+    .spin-bar { display: grid; justify-items: center; gap: 10px; }
+    .center { text-align: center; margin: 0; }
+    .side-col { display: grid; gap: 16px; position: sticky; top: 80px; }
+    .section-title { margin: 0; font-size: 15px; font-weight: 600; }
+    .side-col .winners-list { margin-top: 14px; max-height: 420px; overflow-y: auto; }
+
+    /* Wheel */
+    .wheel-wrap { position: relative; width: 100%; max-width: 540px; aspect-ratio: 1; margin: 0 auto; }
+    .wheel-wrap::before {
+      content: ''; position: absolute; inset: -6%; border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,31,61,.35), transparent 64%); filter: blur(12px); z-index: -1;
+      animation: breathe 4s ease-in-out infinite;
+    }
+    @keyframes breathe { 0%,100% { opacity: .6; transform: scale(.98); } 50% { opacity: 1; transform: scale(1.02); } }
+    .wheel-wrap canvas { width: 100%; height: 100%; display: block; border-radius: 50%; }
+    .wheel-pointer {
+      position: absolute; top: -3%; left: 50%; width: 9%; aspect-ratio: .78; transform: translateX(-50%); z-index: 2;
+      filter: drop-shadow(0 4px 10px rgba(255,31,61,.8));
+    }
+    .wheel-pointer svg { width: 100%; height: 100%; display: block; }
+    .wheel-pointer.tick { animation: tick .12s ease; }
+    @keyframes tick { 50% { transform: translateX(-50%) rotate(-14deg); } }
+
+    /* Stats & Winners */
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .stat { padding: 14px; border-radius: 14px; background: rgba(0,0,0,.28); border: 1px solid var(--line); min-width: 0; }
+    .stat b { display: block; font-family: var(--display); font-size: 30px; line-height: 1; margin-top: 6px; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+    .winners-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    .winners-list li {
+      display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center;
+      padding: 10px 12px; border-radius: 12px; background: rgba(0,0,0,.25); border: 1px solid var(--line);
+      animation: slideIn .4s ease both;
+    }
+    .winners-list li.fresh { border-color: rgba(255,31,61,.5); background: rgba(255,31,61,.07); }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(-6px); } }
+    .avatar { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-weight: 700; font-size: 13px; background: linear-gradient(135deg, var(--red-deep), #3a0b52); color: #fff; }
+    .winners-list .who { min-width: 0; }
+    .winners-list .who b { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .winners-list .who small { color: var(--faint); font-size: 12px; }
+    .winners-list .amt { font-family: var(--display); font-size: 24px; color: var(--gold); line-height: 1; }
+
+    /* Footer */
+    .foot { display: flex; flex-wrap: wrap; gap: 8px 20px; justify-content: space-between; max-width: 1180px; margin: 0 auto; padding: 22px 16px 32px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+
+    /* Winner Overlay / Reveal */
+    .winner-overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 16px; background: rgba(3,3,6,.78); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); animation: fade .3s; }
+    .winner-card {
+      position: relative; width: min(460px, 100%); text-align: center; padding: 38px 28px 28px; border-radius: 24px;
+      background: linear-gradient(180deg, #1c1018, #0f0c13); border: 1px solid rgba(255,31,61,.45);
+      box-shadow: 0 0 0 1px rgba(255,255,255,.04), 0 30px 90px rgba(255,31,61,.35);
+      animation: pop .55s cubic-bezier(.2,1.4,.4,1);
+    }
+    .winner-card .winner-avatar-hub {
+      width: 86px; height: 86px; border-radius: 50%; margin: -82px auto 10px; display: grid; place-items: center;
+      border: 3px solid var(--red); box-shadow: 0 0 30px var(--red-glow); background: #14131a; overflow: hidden;
+    }
+    .winner-card .winner-avatar-hub img { width: 100%; height: 100%; object-fit: cover; }
+    .winner-name { font-family: var(--display); font-size: clamp(30px, 7vw, 44px); line-height: 1; margin: 10px 0 4px; word-break: break-all; }
+    .winner-prize {
+      font-family: var(--display); font-size: clamp(54px, 15vw, 84px); line-height: .95; margin: 12px 0 6px;
+      background: linear-gradient(180deg, #fff 10%, #ffcf5a 55%, #ff8a3d); -webkit-background-clip: text; background-clip: text; color: transparent;
+      filter: drop-shadow(0 4px 24px rgba(255,180,60,.3));
+    }
+    #confettiCanvas { position: fixed; inset: 0; pointer-events: none; z-index: 90; width: 100%; height: 100%; }
+
+    /* Admin View & Sidebar */
+    .admin-shell { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: 100vh; }
+    .sidebar {
+      position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 18px; padding: 18px 14px;
+      border-right: 1px solid var(--line); background: rgba(10, 9, 13, .85); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    }
+    .side-brand {
+      display: flex; align-items: center; gap: 10px; text-decoration: none; padding: 6px 8px; cursor: pointer;
+      border-radius: 12px; transition: background .2s ease, transform .15s ease;
+    }
+    .side-brand:hover { background: rgba(255, 255, 255, 0.05); }
+    .side-brand:active { transform: scale(0.98); }
+    .side-brand span { font-size: 24px; letter-spacing: .05em; font-family: var(--display); line-height: 1; }
+    .nav { display: grid; gap: 4px; }
+    .nav button {
+      display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 12px; border-radius: 11px; border: 0;
+      background: transparent; color: var(--muted); font-weight: 500; cursor: pointer; text-align: left; transition: background .2s, color .2s;
+    }
+    .nav button svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .nav button:hover { color: var(--text); background: rgba(255,255,255,.04); }
+    .nav button[aria-current="page"] { color: var(--text); background: linear-gradient(90deg, rgba(255,31,61,.18), rgba(255,31,61,.02)); box-shadow: inset 2px 0 0 var(--red); }
+    .nav button[data-tab="exclusions"][aria-current="page"] { background: linear-gradient(90deg, rgba(176,60,255,.2), rgba(176,60,255,.02)); box-shadow: inset 2px 0 0 var(--violet); }
+    .side-foot { margin-top: auto; display: grid; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+    .me { display: flex; gap: 10px; align-items: center; }
+    .me b { display: block; font-size: 14px; }
+    .me small { display: block; font-size: 12px; text-transform: capitalize; }
+
+    .main { padding: 20px clamp(16px, 3vw, 34px) 60px; min-width: 0; }
+    .main-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+    .campaign-picker { display: grid; gap: 4px; min-width: min(320px, 100%); }
+    .campaign-picker select { height: 44px; font-weight: 600; }
+
+    .panel { animation: fade .3s ease; }
+    .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .draw-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(280px, 1fr); gap: 16px; align-items: start; }
+    .draw-stage { display: grid; gap: 18px; padding-top: 34px; }
+    .draw-stage .wheel-wrap { max-width: 480px; }
+    .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .narrow { max-width: 720px; }
+    .toolbar { gap: 8px; }
+    .search { max-width: 340px; }
+    .w-check { width: 40px; }
+    input[type="checkbox"]:not(.switch input) { width: 17px; height: 17px; accent-color: var(--red); cursor: pointer; }
+    .divider { height: 1px; background: var(--line); margin: 6px 0; }
+    .form-error { margin: 0; min-height: 0; color: #ff6b80; font-size: 13px; }
+    .full { grid-column: 1 / -1; margin: 0; }
+
+    /* Modals & Toasts */
+    .toasts { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); display: grid; gap: 8px; z-index: 120; width: min(92vw, 420px); pointer-events: none; }
+    .toast {
+      padding: 12px 16px; border-radius: 12px; background: #1d1b25; border: 1px solid var(--line-strong);
+      box-shadow: var(--shadow); font-size: 14px; animation: toastIn .3s cubic-bezier(.2,1.2,.4,1); pointer-events: auto;
+    }
+    .toast.error { border-color: rgba(255,31,61,.55); color: #ff8193; }
+    .toast.success { border-color: rgba(47,212,124,.5); color: #6ff0a8; }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+
+    .modal-backdrop {
+      position: fixed; inset: 0; z-index: 110; display: grid; place-items: center; padding: 16px;
+      background: rgba(3, 3, 6, 0.76); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+      animation: fade .25s ease;
+    }
+    .modal { width: min(460px, 100%); padding: 26px; background: var(--surface-solid); border: 1px solid var(--line-strong); border-radius: 20px; box-shadow: var(--shadow); animation: pop .35s cubic-bezier(.2,1.3,.4,1); }
+    .modal h3 { margin: 0 0 8px; font-size: 18px; }
+    .modal p { margin: 0 0 20px; color: var(--muted); }
+    @keyframes fade { from { opacity: 0; } }
+    @keyframes pop { from { opacity: 0; transform: scale(.94) translateY(8px); } }
+
+    /* Login Form Card */
+    .login-container { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+    .login-card { width: min(400px, 100%); padding: 34px 28px 26px; display: grid; gap: 14px; text-align: center; }
+    .login-logo { width: 84px; height: 84px; border-radius: 50%; margin: 0 auto; object-fit: cover; border: 2px solid var(--red); box-shadow: 0 0 34px var(--red-glow); background: #000; display: grid; place-items: center; }
+    .login-card h1 { margin: 6px 0 0; font-size: 42px; }
+    .login-card h1 em, .side-brand em { font-style: normal; color: var(--red); }
+
+    /* Responsive */
+    @media (max-width: 1080px) {
+      .draw-grid { grid-template-columns: 1fr; }
+      .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 900px) {
+      .stage-grid { grid-template-columns: 1fr; }
+      .side-col { position: static; }
+      .hero { padding-top: 30px; }
+    }
+
+    /* Clean View Header Handling (Eliminates duplicate logos in admin dashboard & login) */
+    body[data-view="admin"] .topbar {
+      display: none;
+    }
+    body[data-view="login"] .topbar {
+      display: none;
+    }
+
+    @media (max-width: 860px) {
+      body[data-view="admin"] .topbar {
+        display: flex;
+      }
+      body[data-view="admin"] .topbar #adminSwitchBtn {
+        display: none;
+      }
+      .admin-shell { grid-template-columns: 1fr; }
+      .sidebar {
+        position: fixed; top: auto; bottom: 0; left: 0; right: 0; height: auto; z-index: 30; flex-direction: row; padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+        border-right: 0; border-top: 1px solid var(--line); background: rgba(10,9,13,.95);
+      }
+      .side-brand, .side-foot { display: none; }
+      .nav { display: flex; width: 100%; justify-content: space-around; gap: 2px; overflow-x: auto; }
+      .nav button { flex-direction: column; gap: 3px; padding: 7px 6px; font-size: 10.5px; text-align: center; justify-content: center; min-width: 58px; }
+      .nav button[aria-current="page"] { box-shadow: inset 0 2px 0 var(--red); }
+      .nav button[data-tab="exclusions"][aria-current="page"] { box-shadow: inset 0 2px 0 var(--violet); }
+      .main { padding-bottom: 110px; }
+      .two-col, .grid-2 { grid-template-columns: 1fr; }
+      .campaign-picker { flex: 1 1 100%; }
+      .search { max-width: none; flex: 1 1 100%; }
+    }
+  </style>
+</head>
+<body data-view="public">
+  <!-- Header Bar -->
+  <header class="topbar">
+    <div class="brand" id="brandHomeBtn" role="button" tabindex="0">
+      <div class="brand-logo-wrap">
+        <img src="assets/logo.jpg" alt="" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+        <svg style="display:none;" viewBox="0 0 24 24" fill="none" stroke="#ff1f3d" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      </div>
+      <span class="display">LORD <em>EREBUS</em></span>
+    </div>
+    <span class="spacer"></span>
+    <button class="icon-btn" id="soundBtn" type="button" aria-pressed="true" aria-label="Toggle sound" title="Sound">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11 5 6 9H2v6h4l5 4V5z"/>
+        <path class="wave" d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>
+        <path class="mute" d="m22 9-6 6m0-6 6 6"/>
+      </svg>
+    </button>
+    <button class="btn sm ghost" id="adminSwitchBtn" type="button">Admin</button>
+  </header>
+
+  <!-- ================= PUBLIC LIVE VIEW ================= -->
+  <main id="publicView">
+    <section class="hero">
+      <img src="assets/banner.jpg" class="hero-banner-img" alt="" onerror="this.style.display='none'">
+      <div class="hero-bg" aria-hidden="true"></div>
+      <div class="hero-inner">
+        <span class="badge red" id="liveBadge"><span class="dot live"></span>LIVE GIVEAWAY</span>
+        <h1 class="display" id="pubCampaignName">Lucky Wheel</h1>
+        <p class="muted" id="pubPrizeLine">Loading prizes...</p>
+      </div>
+    </section>
+
+    <div class="stage-grid">
+      <section class="wheel-col">
+        <div class="wheel-wrap">
+          <div class="wheel-pointer" id="pubPointer" aria-hidden="true">
+            <svg viewBox="0 0 40 52">
+              <defs>
+                <linearGradient id="pg" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0" stop-color="#fff"/>
+                  <stop offset=".35" stop-color="#ff4d64"/>
+                  <stop offset="1" stop-color="#b30f2a"/>
+                </linearGradient>
+              </defs>
+              <path d="M20 52 3 16A17 17 0 1 1 37 16Z" fill="url(#pg)" stroke="#fff" stroke-width="2"/>
+              <circle cx="20" cy="17" r="6" fill="#0a0709"/>
+            </svg>
+          </div>
+          <canvas id="pubWheel" role="img" aria-label="Prize wheel"></canvas>
+        </div>
+        <div class="spin-bar">
+          <button class="btn primary lg" id="pubSpinBtn" type="button" hidden>SPIN THE WHEEL</button>
+          <p class="muted center" id="pubSpinHint">Watch live — the wheel spins automatically when the host draws a winner.</p>
+        </div>
+      </section>
+
+      <aside class="side-col">
+        <div class="card pad">
+          <div class="stats">
+            <div class="stat"><span class="eyebrow">Entries</span><b id="pubStatEntries">—</b></div>
+            <div class="stat"><span class="eyebrow">Winners</span><b id="pubStatWinners">—</b></div>
+            <div class="stat"><span class="eyebrow">Awarded</span><b id="pubStatPaid">—</b></div>
+          </div>
+        </div>
+        <div class="card pad">
+          <div class="row">
+            <h2 class="section-title">Recent winners</h2>
+            <span class="spacer"></span>
+            <span class="badge" id="pubStatusBadge">—</span>
+          </div>
+          <ul class="winners-list" id="pubWinnersList" style="margin-top:14px;"></ul>
+        </div>
+      </aside>
+    </div>
+
+    <footer class="foot">
+      <span>Winners and prizes are computed locally with SQLite in your browser.</span>
+      <span class="faint">© Lord Erebus — Gaming Beyond Limits</span>
+    </footer>
+  </main>
+
+  <!-- ================= ADMIN LOGIN VIEW ================= -->
+  <section id="loginView" class="login-container" hidden>
+    <form class="card login-card" id="loginForm" novalidate>
+      <div class="login-logo">
+        <img src="assets/logo.jpg" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+        <svg style="display:none;" viewBox="0 0 24 24" fill="none" stroke="#ff1f3d" stroke-width="2" width="44" height="44"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      </div>
+      <h1 class="display">ADMIN <em>ACCESS</em></h1>
+      <p class="muted">Sign in to manage the Lucky Wheel.</p>
+      <div style="font-size:12px;background:rgba(255,207,90,0.1);border:1px solid rgba(255,207,90,0.25);color:var(--gold);padding:8px 12px;border-radius:8px;text-align:left;">
+        Default login: <b>admin</b> / <b>admin123</b>
+      </div>
+      <label class="field" style="text-align:left;">
+        <span>Username</span>
+        <input class="input" name="username" autocomplete="username" value="admin" required maxlength="32">
+      </label>
+      <label class="field" style="text-align:left;">
+        <span>Password</span>
+        <input class="input" name="password" type="password" autocomplete="current-password" value="admin123" required>
+      </label>
+      <p class="form-error" id="loginError" role="alert"></p>
+      <button class="btn primary" type="submit">Sign in</button>
+      <button class="btn ghost sm" id="loginBackBtn" type="button">← Back to live wheel</button>
+    </form>
+  </section>
+
+  <!-- ================= ADMIN APP VIEW ================= -->
+  <div id="adminView" class="admin-shell" hidden>
+    <aside class="sidebar">
+      <div class="side-brand" id="adminSideBrand" role="button" tabindex="0" title="Return to live giveaway">
+        <div class="brand-logo-wrap" style="width:36px;height:36px;">
+          <img src="assets/logo.jpg" alt="Lord Erebus Logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+          <svg style="display:none;" viewBox="0 0 24 24" fill="none" stroke="#ff1f3d" stroke-width="2" width="20" height="20"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </div>
+        <span class="display">LORD <em>EREBUS</em></span>
+      </div>
+      <nav class="nav" id="adminNav" aria-label="Sections">
+        <button data-tab="draw" aria-current="page">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l6.5 6.5M12 12 5.5 18.5M12 12H3"/></svg>
+          <span>Draw</span>
+        </button>
+        <button data-tab="participants">
+          <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M16 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6.3"/></svg>
+          <span>Participants</span>
+        </button>
+        <button data-tab="rules">
+          <svg viewBox="0 0 24 24"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H7.5a2.5 2.5 0 1 1 0-5C11 2 12 7 12 7zm0 0h4.5a2.5 2.5 0 1 0 0-5C13 2 12 7 12 7z"/></svg>
+          <span>Prizes & Rules</span>
+        </button>
+        <button data-tab="history">
+          <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 3"/></svg>
+          <span>History</span>
+        </button>
+        <button data-tab="exclusions">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/></svg>
+          <span>Exclusions</span>
+        </button>
+        <button data-tab="settings">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+          <span>Database & Setup</span>
+        </button>
+      </nav>
+      <div class="side-foot">
+        <div class="me">
+          <span class="avatar" id="adminMeAvatar">A</span>
+          <div><b id="adminMeName">admin</b><small id="adminMeRole" class="faint">owner</small></div>
+        </div>
+        <button class="btn sm ghost" id="adminLogoutBtn" type="button">Sign out</button>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="main-head">
+        <div class="campaign-picker">
+          <label class="eyebrow" for="adminCampaignSelect">Campaign</label>
+          <select class="input" id="adminCampaignSelect"></select>
+        </div>
+        <span class="badge" id="adminCampaignStatus">—</span>
+        <span class="badge gold" id="adminFeaturedBadge" hidden>★ On live page</span>
+        <span class="spacer"></span>
+        <button class="icon-btn" id="adminSoundBtn" type="button" aria-pressed="true" aria-label="Toggle sound" title="Sound">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 5 6 9H2v6h4l5 4V5z"/>
+            <path class="wave" d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>
+            <path class="mute" d="m22 9-6 6m0-6 6 6"/>
+          </svg>
+        </button>
+        <button class="btn sm" id="newCampaignBtn" type="button">+ New campaign</button>
+        <button class="btn sm ghost" id="adminToLiveBtn" type="button">Live page ↗</button>
+      </header>
+
+      <!-- TAB: DRAW -->
+      <section class="panel" id="panelDraw">
+        <div class="kpis">
+          <div class="stat"><span class="eyebrow">Participants</span><b id="kParticipants">0</b></div>
+          <div class="stat"><span class="eyebrow">Eligible now</span><b id="kPool">0</b></div>
+          <div class="stat"><span class="eyebrow">Winners</span><b id="kWinners">0</b></div>
+          <div class="stat"><span class="eyebrow">Awarded</span><b id="kPaid">0</b></div>
+        </div>
+        <div class="draw-grid">
+          <div class="card pad draw-stage">
+            <div class="wheel-wrap">
+              <div class="wheel-pointer" id="adminPointer" aria-hidden="true">
+                <svg viewBox="0 0 40 52">
+                  <defs>
+                    <linearGradient id="pgAdmin" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0" stop-color="#fff"/>
+                      <stop offset=".35" stop-color="#ff4d64"/>
+                      <stop offset="1" stop-color="#b30f2a"/>
+                    </linearGradient>
+                  </defs>
+                  <path d="M20 52 3 16A17 17 0 1 1 37 16Z" fill="url(#pgAdmin)" stroke="#fff" stroke-width="2"/>
+                  <circle cx="20" cy="17" r="6" fill="#0a0709"/>
+                </svg>
+              </div>
+              <canvas id="adminWheel" role="img" aria-label="Prize wheel"></canvas>
+            </div>
+            <div class="spin-bar">
+              <button class="btn primary lg" id="adminSpinBtn" type="button">SPIN</button>
+              <p class="muted center" id="adminDrawHint">Ready to spin</p>
+            </div>
+          </div>
+          <div class="card pad">
+            <div class="row">
+              <h2 class="section-title">Latest winners</h2>
+              <span class="spacer"></span>
+              <button class="btn sm ghost" id="gotoHistoryBtn" type="button">All history →</button>
+            </div>
+            <ul class="winners-list" id="adminDrawWinners" style="margin-top:14px; max-height:480px; overflow-y:auto;"></ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: PARTICIPANTS -->
+      <section class="panel" id="panelParticipants" hidden>
+        <div class="two-col">
+          <form class="card pad stack" id="addPartForm" novalidate>
+            <h2 class="section-title">Add participant</h2>
+            <label class="field">
+              <span>UID or Gmail address</span>
+              <input class="input" name="identifier" placeholder="e.g. 51234987 or player@gmail.com" required maxlength="254">
+            </label>
+            <label class="field">
+              <span>Display name <em class="faint">(optional, shown publicly)</em></span>
+              <input class="input" name="displayName" maxlength="60" placeholder="e.g. ShadowBlade">
+            </label>
+            <button class="btn primary" type="submit">Add participant</button>
+          </form>
+
+          <form class="card pad stack" id="bulkPartForm" novalidate>
+            <div class="row">
+              <h2 class="section-title">Bulk import</h2>
+              <span class="spacer"></span>
+              <label class="btn sm" for="bulkFileInput">Upload CSV / TXT</label>
+              <input type="file" id="bulkFileInput" accept=".csv,.txt,text/csv,text/plain" hidden>
+            </div>
+            <label class="field">
+              <span>One UID or email per line (commas also work)</span>
+              <textarea class="input" name="text" rows="4" placeholder="51234987&#10;player.one@gmail.com&#10;ERB_7781"></textarea>
+            </label>
+            <button class="btn primary" type="submit">Import participants</button>
+          </form>
+        </div>
+
+        <div class="card pad" style="margin-top:16px;">
+          <div class="row toolbar">
+            <input class="input search" id="partSearchInput" placeholder="Search participant..." style="height:36px;">
+            <div class="seg" id="partFilterSeg">
+              <button type="button" data-filter="all" aria-pressed="true">All</button>
+              <button type="button" data-filter="eligible">Eligible</button>
+              <button type="button" data-filter="ineligible">Ineligible</button>
+            </div>
+            <span class="spacer"></span>
+            <button class="btn sm" id="batchEligibleBtn" type="button">Mark Eligible</button>
+            <button class="btn sm" id="batchIneligibleBtn" type="button">Mark Ineligible</button>
+            <button class="btn sm danger" id="batchDeleteBtn" type="button">Delete Selected</button>
+          </div>
+          <div class="table-wrap" style="margin-top:14px;">
+            <table>
+              <thead>
+                <tr>
+                  <th class="w-check"><input type="checkbox" id="partSelectAll"></th>
+                  <th>Identifier</th>
+                  <th>Display Name</th>
+                  <th>Status</th>
+                  <th>Wins</th>
+                  <th>Added</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="participantsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: RULES & PRIZES -->
+      <section class="panel" id="panelRules" hidden>
+        <form class="card pad stack narrow" id="campaignRulesForm" novalidate>
+          <div class="grid-2">
+            <label class="field"><span>Campaign name</span><input class="input" name="name" required maxlength="80"></label>
+            <label class="field"><span>Currency symbol</span><input class="input" name="currency" maxlength="5" required value="$"></label>
+          </div>
+          <div class="divider"></div>
+          <h2 class="section-title">Prize Configuration</h2>
+          <div class="seg" id="prizeModeSeg" role="group">
+            <button type="button" data-mode="random" aria-pressed="true">Random range</button>
+            <button type="button" data-mode="fixed">Fixed amount</button>
+            <button type="button" data-mode="list">Prize list</button>
+          </div>
+          <div class="grid-2" id="prizeGroupRandom">
+            <label class="field"><span>Minimum prize</span><input class="input" name="minPrize" type="number" min="0" step="1" value="100"></label>
+            <label class="field"><span>Maximum prize</span><input class="input" name="maxPrize" type="number" min="0" step="1" value="1000"></label>
+            <p class="hint full">Each winner receives a random whole number in this range.</p>
+          </div>
+          <div id="prizeGroupFixed" hidden>
+            <label class="field"><span>Prize per winner</span><input class="input" name="fixedPrize" type="number" min="0" step="1" value="500"></label>
+          </div>
+          <div id="prizeGroupList" hidden>
+            <label class="field"><span>Prizes in draw order (1st winner gets 1st amount...)</span><textarea class="input" name="prizeList" rows="3" placeholder="1000&#10;500&#10;250"></textarea></label>
+          </div>
+          <label class="field">
+            <span>Total budget <em class="faint">(0 = unlimited; payouts never exceed this)</em></span>
+            <input class="input" name="totalBudget" type="number" min="0" step="1" value="0">
+          </label>
+          <label class="field">
+            <span>Max per person <em class="faint">(0 = unlimited; maximum total a participant can win)</em></span>
+            <input class="input" name="maxPerPerson" type="number" min="0" step="1" value="0">
+          </label>
+          <div class="divider"></div>
+          <h2 class="section-title">Eligibility & Display Rules</h2>
+          <label class="field">
+            <span>Maximum winners <em class="faint">(0 = unlimited; closes automatically when reached)</em></span>
+            <input class="input" name="maxWinners" type="number" min="0" step="1" value="0">
+          </label>
+          <label class="switch"><input type="checkbox" name="allowRepeatWinners"><span class="track"></span><span>Allow the same participant to win more than once</span></label>
+          <label class="switch"><input type="checkbox" name="maskPublic" checked><span class="track"></span><span>Mask UIDs / emails on the public live page</span></label>
+          <label class="switch"><input type="checkbox" name="isActive" checked><span class="track"></span><span>Campaign is Active (Open for draws)</span></label>
+
+          <div class="row" style="margin-top:10px;">
+            <button class="btn primary" type="submit">Save changes</button>
+            <button class="btn" type="button" id="setFeaturedBtn">Show on live page</button>
+            <span class="spacer"></span>
+            <button class="btn danger" type="button" id="deleteCampaignBtn">Delete campaign</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- TAB: HISTORY -->
+      <section class="panel" id="panelHistory" hidden>
+        <div class="card pad">
+          <div class="row toolbar">
+            <div class="seg" id="historyScopeSeg">
+              <button type="button" data-scope="campaign" aria-pressed="true">This campaign</button>
+              <button type="button" data-scope="all">All campaigns</button>
+            </div>
+            <span class="spacer"></span>
+            <button class="btn sm" id="exportHistoryCsvBtn" type="button">Export CSV</button>
+            <button class="btn sm danger" id="clearHistoryBtn" type="button">Clear history</button>
+          </div>
+          <div class="table-wrap" style="margin-top:14px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Winner</th>
+                  <th>Prize</th>
+                  <th>Pool</th>
+                  <th>Campaign</th>
+                  <th>By</th>
+                  <th>When</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="historyTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: EXCLUSIONS & AUDIT -->
+      <section class="panel" id="panelExclusions" hidden>
+        <div class="two-col">
+          <form class="card pad stack" id="excludeForm" novalidate>
+            <div><span class="badge violet">Restricted</span></div>
+            <h2 class="section-title">Exclude participants</h2>
+            <p class="muted" style="font-size:13px; margin:0;">Excluded participants stay in the list but are excluded from all draws in this campaign.</p>
+            <textarea class="input" name="text" rows="3" placeholder="One UID or email per line"></textarea>
+            <div class="row">
+              <input class="input grow" name="reason" maxlength="150" placeholder="Reason (e.g. Staff, Banned)" style="flex:1;">
+              <button class="btn primary" type="submit">Exclude</button>
+            </div>
+          </form>
+
+          <div class="card pad stack">
+            <h2 class="section-title">Excluded List (<span id="exCount">0</span>)</h2>
+            <div class="table-wrap" style="max-height:220px; overflow-y:auto;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Participant</th>
+                    <th>Reason</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="exclusionsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card pad" style="margin-top:16px;">
+          <div class="row toolbar">
+            <h2 class="section-title">Audit log</h2>
+          </div>
+          <div class="table-wrap" style="margin-top:14px; max-height:300px; overflow-y:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>When</th>
+                  <th>Admin</th>
+                  <th>Action</th>
+                  <th>Campaign</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody id="auditTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: DATABASE & SETUP -->
+      <section class="panel" id="panelSettings" hidden>
+        <div class="two-col">
+          <div class="card pad stack">
+            <h2 class="section-title">Local SQLite Database</h2>
+            <p class="muted" style="font-size:13px; margin:0;">
+              This app runs a real <b>SQLite 3 database in WebAssembly</b> (sql.js). All data is saved automatically to your browser's persistent <b>IndexedDB</b> storage.
+            </p>
+            <div style="background:rgba(0,0,0,0.3); border:1px solid var(--line); border-radius:12px; padding:12px; font-size:13px;" class="stack">
+              <div class="row"><span>Engine:</span><b style="color:var(--ok);">SQLite 3 (WASM)</b></div>
+              <div class="row"><span>Storage:</span><b>IndexedDB (luckywheel_sqlite)</b></div>
+              <div class="row"><span>Status:</span><b id="dbStatusBadge">Ready & Connected</b></div>
+            </div>
+            <div class="row">
+              <button class="btn primary sm" id="exportDbBtn" type="button">⬇ Export SQLite .db file</button>
+              <label class="btn sm" for="importDbInput">⬆ Import SQLite .db file</label>
+              <input type="file" id="importDbInput" accept=".db,.sqlite,.sqlite3" hidden>
+            </div>
+            <div class="divider"></div>
+            <h2 class="section-title">Quick Actions</h2>
+            <div class="row">
+              <button class="btn sm" id="seedDemoDataBtn" type="button">Seed Demo Participants</button>
+              <button class="btn sm danger" id="resetDbBtn" type="button">Reset Database to Default</button>
+            </div>
+          </div>
+
+          <form class="card pad stack" id="changePasswordForm" novalidate>
+            <h2 class="section-title">Change Admin Password</h2>
+            <label class="field"><span>Current password</span><input class="input" type="password" name="current" required></label>
+            <label class="field"><span>New password <em class="faint">(min 6 characters)</em></span><input class="input" type="password" name="next" minlength="6" required></label>
+            <button class="btn primary" type="submit">Update password</button>
+          </form>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Confetti Canvas -->
+  <canvas id="confettiCanvas"></canvas>
+
+  <!-- Toast Container -->
+  <div class="toasts" id="toastsContainer" role="status"></div>
+
+  <!-- New Campaign Modal -->
+  <div class="modal-backdrop" id="newCampaignModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true">
+      <h3>Create New Campaign</h3>
+      <p>Give your giveaway campaign a name. You can configure prizes and participants once created.</p>
+      <form class="stack" id="newCampaignForm">
+        <label class="field">
+          <span>Campaign Name</span>
+          <input class="input" id="newCampNameInput" placeholder="e.g. Summer Esports Giveaway" required maxlength="80">
+        </label>
+        <div class="row">
+          <span class="spacer"></span>
+          <button class="btn ghost" type="button" id="closeNewCampModalBtn">Cancel</button>
+          <button class="btn primary" type="submit">Create Campaign</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Application Logic -->
+  <script>
+    /* ==========================================================================
+       1. SYNTHETIC SOUND & AUDIO (Web Audio API)
+       ========================================================================== */
+    class SoundEffects {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+        this.lastTickTime = 0;
+      }
+      unlock() {
+        try {
+          this.ctx = this.ctx || new (window.AudioContext || window.webkitAudioContext)();
+          if (this.ctx.state === 'suspended') this.ctx.resume();
+        } catch (e) {
+          this.ctx = null;
+        }
+      }
+      tick(intensity = 1) {
+        if (!this.enabled || !this.ctx || this.ctx.state !== 'running') return;
+        const now = this.ctx.currentTime;
+        if (now - this.lastTickTime < 0.035) return;
+        this.lastTickTime = now;
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.value = 1500 + Math.random() * 300;
+          gain.gain.setValueAtTime(0.05 * Math.min(intensity, 1.5), now);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+          osc.connect(gain).connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.06);
+        } catch (e) {}
+      }
+      fanfare() {
+        if (!this.enabled || !this.ctx || this.ctx.state !== 'running') return;
+        const now = this.ctx.currentTime;
+        const freqs = [523.25, 659.25, 783.99, 1046.5];
+        freqs.forEach((f, i) => {
+          try {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = f;
+            const t = now + i * 0.11;
+            gain.gain.setValueAtTime(0, t);
+            gain.gain.linearRampToValueAtTime(0.09, t + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+            osc.connect(gain).connect(this.ctx.destination);
+            osc.start(t);
+            osc.stop(t + 0.65);
+          } catch (e) {}
+        });
+      }
+    }
+    const sound = new SoundEffects();
+    document.addEventListener('pointerdown', () => sound.unlock(), { once: true });
+
+    /* ==========================================================================
+       2. CONFETTI BURST SIMULATION
+       ========================================================================== */
+    function launchConfetti(duration = 3800) {
+      const canvas = document.getElementById('confettiCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const W = (canvas.width = window.innerWidth * dpr);
+      const H = (canvas.height = window.innerHeight * dpr);
+      const colors = ['#ff1f3d', '#ffcf5a', '#b03cff', '#ffffff', '#ff7a90', '#2fd47c'];
+      const parts = [];
+
+      const burst = (x, dir) => {
+        for (let i = 0; i < 110; i++) {
+          const a = -Math.PI / 2 + dir * (0.25 + Math.random() * 0.65);
+          const sp = (9 + Math.random() * 14) * dpr;
+          parts.push({
+            x, y: H, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+            s: (5 + Math.random() * 7) * dpr, r: Math.random() * Math.PI * 2,
+            vr: (Math.random() - 0.5) * 0.4, c: colors[(Math.random() * colors.length) | 0],
+            shape: Math.random() < 0.3 ? 1 : 0, wob: Math.random() * Math.PI * 2
+          });
+        }
+      };
+      burst(W * 0.08, 1);
+      burst(W * 0.92, -1);
+      for (let i = 0; i < 90; i++) {
+        parts.push({
+          x: Math.random() * W, y: -Math.random() * H * 0.4,
+          vx: (Math.random() - 0.5) * 2 * dpr, vy: (2 + Math.random() * 3) * dpr,
+          s: (5 + Math.random() * 6) * dpr, r: Math.random() * Math.PI * 2,
+          vr: (Math.random() - 0.5) * 0.3, c: colors[(Math.random() * colors.length) | 0],
+          shape: 0, wob: Math.random() * Math.PI * 2
+        });
+      }
+
+      const start = performance.now();
+      function frame(t) {
+        const el = t - start;
+        ctx.clearRect(0, 0, W, H);
+        for (const p of parts) {
+          p.vy += 0.32 * dpr;
+          p.vx *= 0.985;
+          p.vy *= 0.985;
+          p.wob += 0.1;
+          p.x += p.vx + Math.sin(p.wob) * dpr;
+          p.y += p.vy;
+          p.r += p.vr;
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.r);
+          ctx.globalAlpha = Math.max(0, 1 - Math.max(0, el - duration + 900) / 900);
+          ctx.fillStyle = p.c;
+          if (p.shape) {
+            ctx.beginPath();
+            ctx.arc(0, 0, p.s / 2, 0, Math.PI * 2);
+            ctx.fill();
+          } else {
+            ctx.fillRect(-p.s / 2, -p.s / 4, p.s, (p.s / 2) * (0.4 + Math.abs(Math.sin(p.wob))));
+          }
+          ctx.restore();
+        }
+        if (el < duration) requestAnimationFrame(frame);
+        else ctx.clearRect(0, 0, W, H);
+      }
+      requestAnimationFrame(frame);
+    }
+
+    /* ==========================================================================
+       3. TOAST & CONFIRM DIALOG HELPERS
+       ========================================================================== */
+    function showToast(msg, type = '') {
+      const box = document.getElementById('toastsContainer');
+      const t = document.createElement('div');
+      t.className = `toast ${type}`;
+      t.textContent = msg;
+      box.appendChild(t);
+      setTimeout(() => {
+        t.style.transition = 'opacity .3s';
+        t.style.opacity = '0';
+        setTimeout(() => t.remove(), 300);
+      }, type === 'error' ? 4500 : 3000);
+    }
+
+    function confirmModal({ title, message, confirmText = 'Confirm', danger = false }) {
+      return new Promise((resolve) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'modal-backdrop';
+        wrap.innerHTML = `<div class="modal" role="dialog" aria-modal="true">
+          <h3>${escapeHTML(title)}</h3>
+          <p>${escapeHTML(message)}</p>
+          <div class="row">
+            <span class="spacer"></span>
+            <button class="btn ghost" data-action="cancel">Cancel</button>
+            <button class="btn ${danger ? 'danger' : 'primary'}" data-action="confirm">${escapeHTML(confirmText)}</button>
+          </div>
+        </div>`;
+        const finish = (val) => { wrap.remove(); resolve(val); };
+        wrap.addEventListener('click', (e) => {
+          if (e.target === wrap || e.target.dataset.action === 'cancel') finish(false);
+          if (e.target.dataset.action === 'confirm') finish(true);
+        });
+        document.body.appendChild(wrap);
+      });
+    }
+
+    function escapeHTML(str) {
+      return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function formatMoney(amount, cur = '$') {
+      return `${cur}${Number(amount || 0).toLocaleString()}`;
+    }
+    function formatTimeAgo(iso) {
+      if (!iso) return 'just now';
+      const d = new Date(iso);
+      const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
+      if (s < 60) return 'just now';
+      if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+      if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+      return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+    }
+
+    /* ==========================================================================
+       4. SQLITE IN-BROWSER MANAGER (sql.js + IndexedDB)
+       ========================================================================== */
+    const IDB_NAME = 'luckywheel_sqlite_db';
+    const IDB_STORE = 'sqlite_file';
+    const IDB_KEY = 'luckywheel_binary';
+
+    function openIDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(IDB_NAME, 1);
+        req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function loadDbFromIDB() {
+      try {
+        const idb = await openIDB();
+        return new Promise((resolve) => {
+          const tx = idb.transaction(IDB_STORE, 'readonly');
+          const req = tx.objectStore(IDB_STORE).get(IDB_KEY);
+          req.onsuccess = () => resolve(req.result || null);
+          req.onerror = () => resolve(null);
+        });
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function saveDbToIDB(binary) {
+      try {
+        const idb = await openIDB();
+        return new Promise((resolve, reject) => {
+          const tx = idb.transaction(IDB_STORE, 'readwrite');
+          tx.objectStore(IDB_STORE).put(binary, IDB_KEY);
+          tx.oncomplete = () => resolve(true);
+          tx.onerror = () => reject(tx.error);
+        });
+      } catch (e) {
+        console.warn('Failed to save to IDB:', e);
+      }
+    }
+
+    class LocalSQLiteDB {
+      constructor() {
+        this.SQL = null;
+        this.db = null;
+        this.initialized = false;
+        this.saveTimer = null;
+      }
+
+      async init() {
+        if (this.initialized) return;
+        try {
+          if (typeof initSqlJs !== 'function') {
+            throw new Error('sql.js library not loaded yet');
+          }
+          this.SQL = await initSqlJs({
+            locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.12.0/${file}`
+          });
+          const savedData = await loadDbFromIDB();
+          if (savedData && savedData.byteLength > 0) {
+            try {
+              this.db = new this.SQL.Database(new Uint8Array(savedData));
+            } catch (err) {
+              console.warn('Saved DB corrupt, creating new:', err);
+              this.db = new this.SQL.Database();
+            }
+          } else {
+            this.db = new this.SQL.Database();
+          }
+          this.initSchema();
+          this.initialized = true;
+          this.scheduleSave();
+        } catch (e) {
+          console.error('SQLite initialization failed, using in-memory mock if needed:', e);
+          throw e;
+        }
+      }
+
+      initSchema() {
+        this.db.run(`
+          CREATE TABLE IF NOT EXISTS admins (
+            id INTEGER PRIMARY KEY,
+            username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            password TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'owner',
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+          );
+          CREATE TABLE IF NOT EXISTS campaigns (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'active',
+            featured INTEGER NOT NULL DEFAULT 0,
+            prize_mode TEXT NOT NULL DEFAULT 'random',
+            min_prize INTEGER NOT NULL DEFAULT 100,
+            max_prize INTEGER NOT NULL DEFAULT 1000,
+            fixed_prize INTEGER NOT NULL DEFAULT 500,
+            prize_list TEXT NOT NULL DEFAULT '[]',
+            currency TEXT NOT NULL DEFAULT '$',
+            max_winners INTEGER NOT NULL DEFAULT 0,
+            allow_repeat_winners INTEGER NOT NULL DEFAULT 0,
+            mask_public INTEGER NOT NULL DEFAULT 1,
+            total_budget INTEGER NOT NULL DEFAULT 0,
+            max_per_person INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+          );
+          CREATE TABLE IF NOT EXISTS participants (
+            id INTEGER PRIMARY KEY,
+            campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+            identifier TEXT NOT NULL,
+            dedupe_key TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            display_name TEXT,
+            eligible INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE (campaign_id, dedupe_key)
+          );
+          CREATE TABLE IF NOT EXISTS draws (
+            id INTEGER PRIMARY KEY,
+            campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+            participant_id INTEGER,
+            identifier TEXT NOT NULL,
+            public_label TEXT NOT NULL,
+            prize INTEGER NOT NULL,
+            currency TEXT NOT NULL,
+            selection_type TEXT NOT NULL DEFAULT 'random',
+            request_id TEXT NOT NULL UNIQUE,
+            pool_size INTEGER NOT NULL,
+            pool_snapshot TEXT NOT NULL,
+            admin_username TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+          );
+          CREATE TABLE IF NOT EXISTS exclusions (
+            id INTEGER PRIMARY KEY,
+            campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+            participant_id INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
+            reason TEXT,
+            admin_username TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE (campaign_id, participant_id)
+          );
+          CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY,
+            admin_name TEXT,
+            action TEXT NOT NULL,
+            campaign_id INTEGER,
+            details TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+          );
+        `);
+
+        // Check if default admin exists
+        const adminCheck = this.query("SELECT COUNT(*) as c FROM admins");
+        if (adminCheck[0].c === 0) {
+          this.run("INSERT INTO admins (username, password, role) VALUES (?, ?, 'owner')", ['admin', 'admin123']);
+        }
+
+        // Check if default campaign exists
+        const campCheck = this.query("SELECT COUNT(*) as c FROM campaigns");
+        if (campCheck[0].c === 0) {
+          this.run(`INSERT INTO campaigns (name, featured, prize_mode, min_prize, max_prize, currency)
+                    VALUES ('Lord Erebus Giveaway', 1, 'random', 100, 1000, '$')`);
+        }
+      }
+
+      query(sql, params = []) {
+        const stmt = this.db.prepare(sql);
+        stmt.bind(params);
+        const rows = [];
+        while (stmt.step()) {
+          rows.push(stmt.getAsObject());
+        }
+        stmt.free();
+        return rows;
+      }
+
+      run(sql, params = []) {
+        this.db.run(sql, params);
+        this.scheduleSave();
+      }
+
+      scheduleSave() {
+        if (this.saveTimer) clearTimeout(this.saveTimer);
+        this.saveTimer = setTimeout(() => {
+          try {
+            const binary = this.db.export();
+            saveDbToIDB(binary);
+          } catch (e) {
+            console.warn('Error exporting DB:', e);
+          }
+        }, 200);
+      }
+
+      exportBinary() {
+        return this.db.export();
+      }
+
+      async importBinary(uint8Array) {
+        this.db.close();
+        this.db = new this.SQL.Database(uint8Array);
+        this.initSchema();
+        await saveDbToIDB(uint8Array);
+      }
+
+      async resetToDefault() {
+        this.db.close();
+        this.db = new this.SQL.Database();
+        this.initSchema();
+        this.scheduleSave();
+      }
+    }
+
+    const appDb = new LocalSQLiteDB();
+
+    /* ==========================================================================
+       5. IDENTIFIER & PARTICIPANT VALIDATION
+       ========================================================================== */
+    const EMAIL_RE = /^[a-z0-9._%+-]{1,64}@[a-z0-9.-]{1,190}\.[a-z]{2,24}$/i;
+    const UID_RE = /^[A-Za-z0-9_-]{3,64}$/;
+
+    function parseIdentifier(raw) {
+      const value = String(raw ?? '').trim();
+      if (!value) return null;
+      if (value.includes('@')) {
+        const email = value.toLowerCase();
+        if (!EMAIL_RE.test(email) || email.includes('..')) return { error: 'Invalid email address' };
+        let [local, domain] = email.split('@');
+        if (domain === 'gmail.com' || domain === 'googlemail.com') {
+          local = local.split('+')[0].replace(/\./g, '');
+          domain = 'gmail.com';
+        }
+        return { identifier: email, kind: 'email', dedupe_key: `e:${local}@${domain}` };
+      }
+      if (!UID_RE.test(value)) return { error: 'UID must be 3–64 letters, digits, - or _' };
+      return { identifier: value, kind: 'uid', dedupe_key: `u:${value.toLowerCase()}` };
+    }
+
+    function maskIdentifier(identifier, displayName, kind, mask = true) {
+      if (!mask) return displayName || identifier;
+      if (displayName) return displayName;
+      if (kind === 'email' || identifier.includes('@')) {
+        const [local, domain] = identifier.split('@');
+        const keep = local.length <= 2 ? 1 : 2;
+        return `${local.slice(0, keep)}${'•'.repeat(Math.min(5, Math.max(2, local.length - keep)))}@${domain}`;
+      }
+      if (identifier.length <= 4) return identifier[0] + '•'.repeat(identifier.length - 1);
+      return `${identifier.slice(0, 2)}${'•'.repeat(Math.min(5, identifier.length - 4))}${identifier.slice(-2)}`;
+    }
+
+    /* ==========================================================================
+       6. CANVAS LUCKY WHEEL ENGINE
+       ========================================================================== */
+    const TAU = Math.PI * 2;
+    const WHEEL_PALETTE = [
+      ['#ff1f3d', '#ffffff'],
+      ['#16121b', '#f1e9f3'],
+      ['#8f0e25', '#ffe3e8'],
+      ['#221630', '#e9d6ff'],
+      ['#c8123a', '#ffffff'],
+      ['#0f0d13', '#ff8193'],
+    ];
+
+    class CanvasWheel {
+      constructor(canvas, { onTick } = {}) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.onTick = onTick;
+        this.segments = [];
+        this.rot = 0;
+        this.spinning = false;
+        this.lastIndex = -1;
+        this.face = null;
+        this.hubImg = new Image();
+        this.hubImg.src = 'assets/logo.jpg';
+        this.hubImg.onload = () => this.draw();
+
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+      }
+
+      resize() {
+        const rect = this.canvas.getBoundingClientRect();
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        const size = Math.max(280, Math.floor((rect.width || 420) * dpr));
+        if (this.canvas.width !== size || this.canvas.height !== size) {
+          this.canvas.width = size;
+          this.canvas.height = size;
+          this.face = null;
+          this.draw();
+        }
+      }
+
+      setSegments(segments) {
+        this.segments = segments || [];
+        this.face = null;
+        this.draw();
+      }
+
+      renderFace() {
+        const S = this.canvas.width;
+        const R = S / 2;
+        const off = document.createElement('canvas');
+        off.width = S;
+        off.height = S;
+        const c = off.getContext('2d');
+        c.translate(R, R);
+
+        const rim = R * 0.94;
+        const n = this.segments.length;
+        const seg = n > 0 ? TAU / n : TAU;
+
+        // Background / Segments
+        if (n === 0) {
+          c.beginPath();
+          c.arc(0, 0, rim, 0, TAU);
+          c.fillStyle = '#16121b';
+          c.fill();
+        } else {
+          for (let i = 0; i < n; i++) {
+            let pi = i % WHEEL_PALETTE.length;
+            if (i === n - 1 && n > 1 && pi === 0) pi = 2;
+            const [bg] = WHEEL_PALETTE[pi];
+            const a0 = i * seg - Math.PI / 2;
+            const a1 = a0 + seg;
+            c.beginPath();
+            c.moveTo(0, 0);
+            c.arc(0, 0, rim, a0, a1);
+            c.closePath();
+            c.fillStyle = bg;
+            c.fill();
+            if (n > 1 && n <= 180) {
+              c.strokeStyle = 'rgba(0,0,0,.45)';
+              c.lineWidth = Math.max(1, S / 700);
+              c.stroke();
+            }
+          }
+
+          // Inner shading for 3D depth
+          const shade = c.createRadialGradient(0, 0, rim * 0.15, 0, 0, rim);
+          shade.addColorStop(0, 'rgba(0,0,0,.45)');
+          shade.addColorStop(0.55, 'rgba(0,0,0,0)');
+          shade.addColorStop(0.92, 'rgba(255,255,255,.06)');
+          shade.addColorStop(1, 'rgba(0,0,0,.35)');
+          c.fillStyle = shade;
+          c.beginPath();
+          c.arc(0, 0, rim, 0, TAU);
+          c.fill();
+
+          // Labels
+          if (n <= 90) {
+            const maxW = rim * 0.6;
+            const fs = Math.max(9, Math.min(rim * 0.075, seg * rim * 0.72 * 0.62));
+            c.textAlign = 'right';
+            c.textBaseline = 'middle';
+            c.font = `600 ${fs}px Inter, sans-serif`;
+            for (let i = 0; i < n; i++) {
+              let pi = i % WHEEL_PALETTE.length;
+              if (i === n - 1 && n > 1 && pi === 0) pi = 2;
+              const a = (i + 0.5) * seg - Math.PI / 2;
+              let label = this.segments[i].label;
+              while (c.measureText(label).width > maxW && label.length > 4) label = label.slice(0, -2);
+              if (label !== this.segments[i].label) label = label.slice(0, -1) + '…';
+              c.save();
+              c.rotate(a);
+              c.fillStyle = WHEEL_PALETTE[pi][1];
+              c.shadowColor = 'rgba(0,0,0,.6)';
+              c.shadowBlur = fs * 0.3;
+              c.fillText(label, rim * 0.9, 0);
+              c.restore();
+            }
+          }
+        }
+
+        // Neon outer ring
+        c.lineWidth = S * 0.012;
+        c.strokeStyle = '#ff1f3d';
+        c.shadowColor = '#ff1f3d';
+        c.shadowBlur = S * 0.03;
+        c.beginPath();
+        c.arc(0, 0, rim, 0, TAU);
+        c.stroke();
+        c.shadowBlur = 0;
+
+        // Outer Studs
+        const studs = 24;
+        for (let i = 0; i < studs; i++) {
+          const a = (i / studs) * TAU;
+          c.beginPath();
+          c.arc(Math.cos(a) * R * 0.97, Math.sin(a) * R * 0.97, S * 0.0085, 0, TAU);
+          c.fillStyle = i % 2 ? '#ffcf5a' : '#ffffff';
+          c.shadowColor = c.fillStyle;
+          c.shadowBlur = S * 0.012;
+          c.fill();
+        }
+        c.shadowBlur = 0;
+        this.face = off;
+      }
+
+      draw() {
+        const S = this.canvas.width;
+        const R = S / 2;
+        if (!this.face) this.renderFace();
+
+        this.ctx.clearRect(0, 0, S, S);
+        this.ctx.save();
+        this.ctx.translate(R, R);
+        this.ctx.rotate(this.rot);
+        this.ctx.drawImage(this.face, -R, -R);
+        this.ctx.restore();
+
+        // Hub (center pin)
+        const hubR = R * 0.17;
+        this.ctx.save();
+        this.ctx.translate(R, R);
+        this.ctx.shadowColor = 'rgba(255,31,61,.8)';
+        this.ctx.shadowBlur = S * 0.04;
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, hubR + S * 0.012, 0, TAU);
+        this.ctx.fillStyle = '#0a0709';
+        this.ctx.fill();
+        this.ctx.shadowBlur = 0;
+        this.ctx.lineWidth = S * 0.008;
+        this.ctx.strokeStyle = '#ff1f3d';
+        this.ctx.stroke();
+
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, hubR, 0, TAU);
+        this.ctx.clip();
+        if (this.hubImg.complete && this.hubImg.naturalWidth > 0) {
+          this.ctx.drawImage(this.hubImg, -hubR * 1.15, -hubR * 1.15, hubR * 2.3, hubR * 2.3);
+        } else {
+          this.ctx.fillStyle = '#16080c';
+          this.ctx.fill();
+          this.ctx.fillStyle = '#ff1f3d';
+          this.ctx.font = `700 ${hubR * 0.8}px Teko, sans-serif`;
+          this.ctx.textAlign = 'center';
+          this.ctx.textBaseline = 'middle';
+          this.ctx.fillText('LE', 0, 2);
+        }
+        this.ctx.restore();
+
+        if (this.segments.length === 0) {
+          this.ctx.save();
+          this.ctx.translate(R, R);
+          this.ctx.fillStyle = 'rgba(255,255,255,.55)';
+          this.ctx.font = `500 ${S * 0.034}px Inter, sans-serif`;
+          this.ctx.textAlign = 'center';
+          this.ctx.fillText('No eligible participants yet', 0, R * 0.45);
+          this.ctx.restore();
+        }
+      }
+
+      indexAtPointer() {
+        const n = this.segments.length;
+        if (!n) return -1;
+        const mod = (a, b) => ((a % b) + b) % b;
+        return Math.floor(mod(-this.rot, TAU) / (TAU / n)) % n;
+      }
+
+      spinTo(targetIndex, { duration = 7000 } = {}) {
+        const n = this.segments.length;
+        if (!n || targetIndex < 0) return Promise.resolve();
+        const seg = TAU / n;
+        const jitter = n > 1 ? (Math.random() - 0.5) * seg * 0.6 : 0;
+        const target = -(targetIndex + 0.5) * seg + jitter;
+        const spins = 6 + Math.floor(Math.random() * 3);
+        const from = this.rot;
+        const mod = (a, b) => ((a % b) + b) % b;
+        const to = from + spins * TAU + mod(target - from, TAU);
+        this.spinning = true;
+
+        const ease = t => 1 - Math.pow(1 - t, 4.2);
+        return new Promise(resolve => {
+          const t0 = performance.now();
+          const step = now => {
+            const t = Math.min(1, (now - t0) / duration);
+            this.rot = from + (to - from) * ease(t);
+            this.draw();
+            const idx = this.indexAtPointer();
+            if (idx !== this.lastIndex) {
+              this.lastIndex = idx;
+              this.onTick?.(1 - t);
+            }
+            if (t < 1) {
+              requestAnimationFrame(step);
+            } else {
+              this.spinning = false;
+              resolve();
+            }
+          };
+          requestAnimationFrame(step);
+        });
+      }
+    }
+
+    /* ==========================================================================
+       7. APPLICATION STATE & CONTROLLER
+       ========================================================================== */
+    let currentAdmin = null;
+    let selectedCampaignId = null;
+    let pubWheelInstance = null;
+    let adminWheelInstance = null;
+    let currentPool = [];
+
+    // Initialize UI on load
+    window.addEventListener('DOMContentLoaded', async () => {
+      // Connect sound buttons (both topbar and admin header)
+      const soundBtns = [document.getElementById('soundBtn'), document.getElementById('adminSoundBtn')].filter(Boolean);
+      function syncSoundButtons() {
+        const state = String(sound.enabled);
+        soundBtns.forEach(btn => btn.setAttribute('aria-pressed', state));
+      }
+      soundBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          sound.enabled = !sound.enabled;
+          syncSoundButtons();
+          if (sound.enabled) sound.unlock();
+        });
+      });
+
+      // View switching
+      document.getElementById('brandHomeBtn').addEventListener('click', () => showView('public'));
+      document.getElementById('adminSwitchBtn').addEventListener('click', () => {
+        if (currentAdmin) showView('admin');
+        else showView('login');
+      });
+      document.getElementById('loginBackBtn').addEventListener('click', () => showView('public'));
+      document.getElementById('adminToLiveBtn').addEventListener('click', () => showView('public'));
+      document.getElementById('adminSideBrand').addEventListener('click', () => showView('public'));
+
+      // Keyboard navigation for brand logos
+      ['brandHomeBtn', 'adminSideBrand'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              showView('public');
+            }
+          });
+        }
+      });
+
+      // Admin tabs
+      document.querySelectorAll('#adminNav button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('#adminNav button').forEach(b => b.removeAttribute('aria-current'));
+          btn.setAttribute('aria-current', 'page');
+          switchAdminTab(btn.dataset.tab);
+        });
+      });
+
+      // Initialize Canvas Wheels
+      const pubPointer = document.getElementById('pubPointer');
+      pubWheelInstance = new CanvasWheel(document.getElementById('pubWheel'), {
+        onTick: (speed) => {
+          sound.tick(0.4 + speed);
+          if (pubPointer) {
+            pubPointer.classList.remove('tick');
+            void pubPointer.offsetWidth;
+            pubPointer.classList.add('tick');
+          }
+        }
+      });
+
+      const adminPointer = document.getElementById('adminPointer');
+      adminWheelInstance = new CanvasWheel(document.getElementById('adminWheel'), {
+        onTick: (speed) => {
+          sound.tick(0.4 + speed);
+          if (adminPointer) {
+            adminPointer.classList.remove('tick');
+            void adminPointer.offsetWidth;
+            adminPointer.classList.add('tick');
+          }
+        }
+      });
+
+      // Setup forms & buttons
+      setupEventListeners();
+
+      // Initialize SQLite database
+      try {
+        await appDb.init();
+        document.getElementById('dbStatusBadge').textContent = 'Ready (WASM SQLite)';
+      } catch (err) {
+        document.getElementById('dbStatusBadge').textContent = 'Error loading sql.js';
+        showToast('Failed to load SQLite WASM: ' + err.message, 'error');
+      }
+
+      // Check session
+      const savedUser = sessionStorage.getItem('luckywheel_admin');
+      if (savedUser) {
+        currentAdmin = JSON.parse(savedUser);
+        document.getElementById('adminSwitchBtn').textContent = 'Dashboard';
+      }
+
+      await loadInitialState();
+    });
+
+    function showView(view) {
+      document.body.dataset.view = view;
+      document.getElementById('publicView').hidden = view !== 'public';
+      document.getElementById('loginView').hidden = view !== 'login';
+      document.getElementById('adminView').hidden = view !== 'admin';
+      window.scrollTo(0, 0);
+      if (view === 'public') {
+        renderPublicPage();
+      } else if (view === 'admin') {
+        renderAdminConsole();
+      }
+    }
+
+    function switchAdminTab(tabName) {
+      document.getElementById('panelDraw').hidden = tabName !== 'draw';
+      document.getElementById('panelParticipants').hidden = tabName !== 'participants';
+      document.getElementById('panelRules').hidden = tabName !== 'rules';
+      document.getElementById('panelHistory').hidden = tabName !== 'history';
+      document.getElementById('panelExclusions').hidden = tabName !== 'exclusions';
+      document.getElementById('panelSettings').hidden = tabName !== 'settings';
+
+      if (tabName === 'draw') renderAdminDrawPanel();
+      if (tabName === 'participants') renderParticipantsTable();
+      if (tabName === 'rules') renderRulesPanel();
+      if (tabName === 'history') renderHistoryTable();
+      if (tabName === 'exclusions') renderExclusionsPanel();
+    }
+
+    /* ==========================================================================
+       8. BUSINESS LOGIC & DATA OPERATIONS
+       ========================================================================== */
+    async function loadInitialState() {
+      const featured = appDb.query("SELECT id FROM campaigns WHERE featured = 1 ORDER BY id DESC LIMIT 1");
+      if (featured.length > 0) {
+        selectedCampaignId = featured[0].id;
+      } else {
+        const anyCamp = appDb.query("SELECT id FROM campaigns ORDER BY id DESC LIMIT 1");
+        if (anyCamp.length > 0) selectedCampaignId = anyCamp[0].id;
+      }
+      populateCampaignSelect();
+      showView(currentAdmin ? 'admin' : 'public');
+    }
+
+    function getCampaign(cid) {
+      const rows = appDb.query("SELECT * FROM campaigns WHERE id = ?", [cid]);
+      return rows[0] || null;
+    }
+
+    function getCandidatePool(campaign) {
+      if (!campaign) return [];
+      const drawsCount = appDb.query("SELECT COUNT(*) as c FROM draws WHERE campaign_id = ?", [campaign.id])[0].c;
+      let need = campaign.min_prize;
+      if (campaign.prize_mode === 'fixed') need = campaign.fixed_prize;
+      else if (campaign.prize_mode === 'list') {
+        const list = JSON.parse(campaign.prize_list || '[]');
+        need = list[drawsCount] ?? 0;
+      }
+
+      // Filter: eligible, not in exclusions, not already won (unless repeat allowed), within per-person cap
+      const sql = `
+        SELECT p.*,
+          COALESCE((SELECT SUM(d.prize) FROM draws d WHERE d.participant_id = p.id), 0) AS won
+        FROM participants p
+        WHERE p.campaign_id = ? AND p.eligible = 1
+          AND NOT EXISTS (SELECT 1 FROM exclusions x WHERE x.campaign_id = p.campaign_id AND x.participant_id = p.id)
+          AND (? = 1 OR NOT EXISTS (SELECT 1 FROM draws d WHERE d.campaign_id = p.campaign_id AND d.participant_id = p.id))
+          AND (? = 0 OR (? - COALESCE((SELECT SUM(d.prize) FROM draws d WHERE d.participant_id = p.id), 0)) >= ?)
+        ORDER BY p.id ASC
+      `;
+      return appDb.query(sql, [campaign.id, campaign.allow_repeat_winners, campaign.max_per_person, campaign.max_per_person, need]);
+    }
+
+    async function executeDraw(campaignId) {
+      const campaign = getCampaign(campaignId);
+      if (!campaign) throw new Error('Campaign not found');
+      if (campaign.status !== 'active') throw new Error('Campaign is closed');
+
+      const drawsCount = appDb.query("SELECT COUNT(*) as c FROM draws WHERE campaign_id = ?", [campaign.id])[0].c;
+      if (campaign.max_winners > 0 && drawsCount >= campaign.max_winners) {
+        throw new Error(`Winner limit reached (${campaign.max_winners})`);
+      }
+
+      // Check remaining budget
+      const paidSoFar = appDb.query("SELECT COALESCE(SUM(prize), 0) as s FROM draws WHERE campaign_id = ?", [campaign.id])[0].s;
+      const budgetRemaining = campaign.total_budget > 0 ? Math.max(0, campaign.total_budget - paidSoFar) : Infinity;
+
+      let need = campaign.min_prize;
+      if (campaign.prize_mode === 'fixed') need = campaign.fixed_prize;
+      else if (campaign.prize_mode === 'list') {
+        const list = JSON.parse(campaign.prize_list || '[]');
+        need = list[drawsCount] ?? null;
+      }
+
+      if (need === null) throw new Error('All prizes in the prize list have been awarded');
+      if (need > budgetRemaining) {
+        throw new Error(`Budget limit reached (${formatMoney(budgetRemaining, campaign.currency)} remaining, need ${formatMoney(need, campaign.currency)})`);
+      }
+
+      const pool = getCandidatePool(campaign);
+      if (pool.length === 0) {
+        throw new Error(campaign.max_per_person > 0
+          ? 'No eligible participants left (everyone reached per-person cap)'
+          : 'No eligible participants left in the draw pool');
+      }
+
+      // Pick winner uniformly at random with cryptographic randomness
+      const randArr = new Uint32Array(1);
+      crypto.getRandomValues(randArr);
+      const winnerIndex = randArr[0] % pool.length;
+      const winner = pool[winnerIndex];
+
+      // Calculate prize
+      let prize = need;
+      if (campaign.prize_mode === 'random') {
+        let top = Math.min(campaign.max_prize, budgetRemaining);
+        if (campaign.max_per_person > 0) {
+          top = Math.min(top, campaign.max_per_person - winner.won);
+        }
+        if (top < campaign.min_prize) top = campaign.min_prize;
+        const span = Math.max(1, top - campaign.min_prize + 1);
+        crypto.getRandomValues(randArr);
+        prize = campaign.min_prize + (randArr[0] % span);
+      }
+
+      const publicLabel = maskIdentifier(winner.identifier, winner.display_name, winner.kind, Boolean(campaign.mask_public));
+      const poolSnapshot = JSON.stringify(pool.map(p => [p.id, maskIdentifier(p.identifier, p.display_name, p.kind, Boolean(campaign.mask_public))]));
+      const requestId = 'req_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+      const adminName = currentAdmin ? currentAdmin.username : 'host';
+
+      appDb.run(`
+        INSERT INTO draws (campaign_id, participant_id, identifier, public_label, prize, currency, selection_type, request_id, pool_size, pool_snapshot, admin_username)
+        VALUES (?, ?, ?, ?, ?, ?, 'random', ?, ?, ?, ?)
+      `, [campaign.id, winner.id, winner.identifier, publicLabel, prize, campaign.currency, requestId, pool.length, poolSnapshot, adminName]);
+
+      const drawId = appDb.query("SELECT last_insert_rowid() as id")[0].id;
+
+      // Check auto-close conditions
+      const nextDrawCount = drawsCount + 1;
+      const leftBudget = budgetRemaining - prize;
+      let nextMin = campaign.min_prize;
+      if (campaign.prize_mode === 'fixed') nextMin = campaign.fixed_prize;
+      else if (campaign.prize_mode === 'list') {
+        const list = JSON.parse(campaign.prize_list || '[]');
+        nextMin = list[nextDrawCount] ?? null;
+      }
+
+      let closeReason = null;
+      if (campaign.max_winners > 0 && nextDrawCount >= campaign.max_winners) {
+        closeReason = 'winner limit reached';
+      } else if (campaign.total_budget > 0 && (nextMin === null || nextMin > leftBudget)) {
+        closeReason = 'budget exhausted';
+      }
+
+      if (closeReason) {
+        appDb.run("UPDATE campaigns SET status = 'closed' WHERE id = ?", [campaign.id]);
+        appDb.run("INSERT INTO audit_log (admin_name, action, campaign_id, details) VALUES (?, 'campaign.auto_closed', ?, ?)",
+          [adminName, campaign.id, JSON.stringify({ reason: closeReason })]);
+      }
+
+      appDb.run("INSERT INTO audit_log (admin_name, action, campaign_id, details) VALUES (?, 'draw.executed', ?, ?)",
+        [adminName, campaign.id, JSON.stringify({ drawId, identifier: winner.identifier, prize })]);
+
+      return {
+        id: drawId,
+        winnerId: winner.id,
+        identifier: winner.identifier,
+        displayName: winner.display_name,
+        label: publicLabel,
+        prize,
+        currency: campaign.currency,
+        poolSize: pool.length,
+        pool: pool.map(p => ({ id: p.id, label: maskIdentifier(p.identifier, p.display_name, p.kind, Boolean(campaign.mask_public)) }))
+      };
+    }
+
+    /* ==========================================================================
+       9. PUBLIC VIEW RENDERING & SPIN
+       ========================================================================== */
+    function renderPublicPage() {
+      const campRows = appDb.query("SELECT * FROM campaigns WHERE featured = 1 ORDER BY id DESC LIMIT 1");
+      const c = campRows[0] || getCampaign(selectedCampaignId);
+
+      if (!c) {
+        document.getElementById('pubCampaignName').textContent = 'Lucky Wheel';
+        document.getElementById('pubPrizeLine').textContent = 'No giveaway active right now.';
+        document.getElementById('liveBadge').hidden = true;
+        pubWheelInstance.setSegments([]);
+        return;
+      }
+
+      document.title = `${c.name} — Lucky Wheel`;
+      document.getElementById('pubCampaignName').textContent = c.name;
+      document.getElementById('liveBadge').hidden = c.status !== 'active';
+      document.getElementById('pubStatusBadge').textContent = c.status === 'active' ? 'Open' : 'Closed';
+      document.getElementById('pubStatusBadge').className = `badge ${c.status === 'active' ? 'green' : ''}`;
+
+      // Prize description
+      if (c.prize_mode === 'fixed') {
+        document.getElementById('pubPrizeLine').textContent = `Every winner takes ${formatMoney(c.fixed_prize, c.currency)}`;
+      } else if (c.prize_mode === 'list') {
+        const list = JSON.parse(c.prize_list || '[]');
+        const max = list.length > 0 ? Math.max(...list) : 0;
+        document.getElementById('pubPrizeLine').textContent = `Prizes up to ${formatMoney(max, c.currency)}`;
+      } else {
+        document.getElementById('pubPrizeLine').textContent = `Win between ${formatMoney(c.min_prize, c.currency)} and ${formatMoney(c.max_prize, c.currency)}`;
+      }
+
+      // Stats
+      const partCount = appDb.query("SELECT COUNT(*) as c FROM participants WHERE campaign_id = ? AND eligible = 1", [c.id])[0].c;
+      const drawsCount = appDb.query("SELECT COUNT(*) as c FROM draws WHERE campaign_id = ?", [c.id])[0].c;
+      const paid = appDb.query("SELECT COALESCE(SUM(prize), 0) as s FROM draws WHERE campaign_id = ?", [c.id])[0].s;
+
+      document.getElementById('pubStatEntries').textContent = partCount.toLocaleString();
+      document.getElementById('pubStatWinners').textContent = drawsCount.toLocaleString();
+      document.getElementById('pubStatPaid').textContent = formatMoney(paid, c.currency);
+
+      // Wheel Segments
+      const pool = getCandidatePool(c);
+      currentPool = pool;
+      const segments = pool.map(p => ({
+        id: p.id,
+        label: maskIdentifier(p.identifier, p.display_name, p.kind, Boolean(c.mask_public))
+      }));
+      pubWheelInstance.setSegments(segments);
+
+      // Spin button for host/admin
+      const spinBtn = document.getElementById('pubSpinBtn');
+      const spinHint = document.getElementById('pubSpinHint');
+      if (currentAdmin) {
+        spinBtn.hidden = false;
+        spinBtn.disabled = pubWheelInstance.spinning || c.status !== 'active' || segments.length === 0;
+        spinHint.textContent = segments.length > 0
+          ? `Signed in as host — ${segments.length} eligible entries ready`
+          : 'No eligible participants left in this campaign';
+      } else {
+        spinBtn.hidden = true;
+        spinHint.textContent = 'Watch live — the wheel spins automatically when the host draws a winner.';
+      }
+
+      // Recent Winners list
+      const draws = appDb.query("SELECT * FROM draws WHERE campaign_id = ? ORDER BY id DESC LIMIT 20", [c.id]);
+      const winnersEl = document.getElementById('pubWinnersList');
+      if (draws.length === 0) {
+        winnersEl.innerHTML = '<li class="empty">No winners yet — the first spin is coming soon!</li>';
+      } else {
+        winnersEl.innerHTML = draws.map(d => `
+          <li>
+            <span class="avatar">${escapeHTML((d.public_label || d.identifier).slice(0, 2).toUpperCase())}</span>
+            <span class="who">
+              <b>${escapeHTML(d.public_label)}</b>
+              <small>${formatTimeAgo(d.created_at)}</small>
+            </span>
+            <span class="amt">${escapeHTML(formatMoney(d.prize, d.currency))}</span>
+          </li>
+        `).join('');
+      }
+    }
+
+    async function spinPublicWheel() {
+      const campRows = appDb.query("SELECT * FROM campaigns WHERE featured = 1 ORDER BY id DESC LIMIT 1");
+      const c = campRows[0] || getCampaign(selectedCampaignId);
+      if (!c) return;
+
+      const spinBtn = document.getElementById('pubSpinBtn');
+      spinBtn.disabled = true;
+      sound.unlock();
+
+      try {
+        const drawResult = await executeDraw(c.id);
+        const idx = drawResult.pool.findIndex(p => p.id === drawResult.winnerId);
+        await pubWheelInstance.spinTo(idx);
+        await new Promise(r => setTimeout(r, 450));
+        sound.fanfare();
+        launchConfetti();
+        await showWinnerModal(drawResult);
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        renderPublicPage();
+      }
+    }
+
+    /* ==========================================================================
+       10. ADMIN DASHBOARD RENDERING & OPERATIONS
+       ========================================================================== */
+    function renderAdminConsole() {
+      if (!currentAdmin) {
+        showView('login');
+        return;
+      }
+      document.getElementById('adminMeName').textContent = currentAdmin.username;
+      document.getElementById('adminMeRole').textContent = currentAdmin.role || 'owner';
+      document.getElementById('adminMeAvatar').textContent = currentAdmin.username.slice(0, 1).toUpperCase();
+
+      populateCampaignSelect();
+      renderAdminCampaignHeader();
+      renderAdminDrawPanel();
+    }
+
+    function populateCampaignSelect() {
+      const camps = appDb.query("SELECT id, name, status, featured FROM campaigns ORDER BY id DESC");
+      const sel = document.getElementById('adminCampaignSelect');
+      sel.innerHTML = camps.map(c => `
+        <option value="${c.id}" ${c.id === selectedCampaignId ? 'selected' : ''}>
+          ${escapeHTML(c.name)} (${c.status}) ${c.featured ? '★ Live' : ''}
+        </option>
+      `).join('');
+      if (!selectedCampaignId && camps.length > 0) {
+        selectedCampaignId = camps[0].id;
+      }
+    }
+
+    function renderAdminCampaignHeader() {
+      const c = getCampaign(selectedCampaignId);
+      if (!c) return;
+      document.getElementById('adminCampaignStatus').textContent = c.status === 'active' ? 'Active' : 'Closed';
+      document.getElementById('adminCampaignStatus').className = `badge ${c.status === 'active' ? 'green' : ''}`;
+      document.getElementById('adminFeaturedBadge').hidden = !c.featured;
+    }
+
+    function renderAdminDrawPanel() {
+      const c = getCampaign(selectedCampaignId);
+      if (!c) return;
+
+      const partCount = appDb.query("SELECT COUNT(*) as c FROM participants WHERE campaign_id = ?", [c.id])[0].c;
+      const pool = getCandidatePool(c);
+      const drawsCount = appDb.query("SELECT COUNT(*) as c FROM draws WHERE campaign_id = ?", [c.id])[0].c;
+      const paid = appDb.query("SELECT COALESCE(SUM(prize), 0) as s FROM draws WHERE campaign_id = ?", [c.id])[0].s;
+
+      document.getElementById('kParticipants').textContent = partCount.toLocaleString();
+      document.getElementById('kPool').textContent = pool.length.toLocaleString();
+      document.getElementById('kWinners').textContent = drawsCount.toLocaleString();
+      document.getElementById('kPaid').textContent = formatMoney(paid, c.currency);
+
+      const segments = pool.map(p => ({
+        id: p.id,
+        label: p.display_name || p.identifier
+      }));
+      adminWheelInstance.setSegments(segments);
+
+      const spinBtn = document.getElementById('adminSpinBtn');
+      spinBtn.disabled = adminWheelInstance.spinning || c.status !== 'active' || segments.length === 0;
+      document.getElementById('adminDrawHint').textContent = segments.length > 0
+        ? `Ready to spin — ${segments.length} eligible participants`
+        : 'No eligible participants in the candidate pool';
+
+      const draws = appDb.query("SELECT * FROM draws WHERE campaign_id = ? ORDER BY id DESC LIMIT 15", [c.id]);
+      const listEl = document.getElementById('adminDrawWinners');
+      if (draws.length === 0) {
+        listEl.innerHTML = '<li class="empty">No draws recorded yet.</li>';
+      } else {
+        listEl.innerHTML = draws.map(d => `
+          <li>
+            <span class="avatar">${escapeHTML(d.identifier.slice(0, 2).toUpperCase())}</span>
+            <span class="who">
+              <b>${escapeHTML(d.identifier)}</b>
+              <small>${formatTimeAgo(d.created_at)}</small>
+            </span>
+            <span class="amt">${escapeHTML(formatMoney(d.prize, d.currency))}</span>
+          </li>
+        `).join('');
+      }
+    }
+
+    async function spinAdminWheel() {
+      const c = getCampaign(selectedCampaignId);
+      if (!c) return;
+      const spinBtn = document.getElementById('adminSpinBtn');
+      spinBtn.disabled = true;
+      sound.unlock();
+
+      try {
+        const drawResult = await executeDraw(c.id);
+        const idx = drawResult.pool.findIndex(p => p.id === drawResult.winnerId);
+        await adminWheelInstance.spinTo(idx);
+        await new Promise(r => setTimeout(r, 450));
+        sound.fanfare();
+        launchConfetti();
+        await showWinnerModal(drawResult);
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        renderAdminCampaignHeader();
+        renderAdminDrawPanel();
+      }
+    }
+
+    function showWinnerModal(draw) {
+      return new Promise(resolve => {
+        const overlay = document.createElement('div');
+        overlay.className = 'winner-overlay';
+        overlay.innerHTML = `
+          <div class="winner-card" role="dialog" aria-modal="true">
+            <div class="winner-avatar-hub">
+              <img src="assets/logo.jpg" alt="" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+              <svg style="display:none;" viewBox="0 0 24 24" fill="none" stroke="#ff1f3d" stroke-width="2" width="40" height="40"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            </div>
+            <div class="eyebrow">We have a winner!</div>
+            <div class="winner-name">${escapeHTML(draw.label || draw.identifier)}</div>
+            <span class="badge green"><span class="dot"></span>Random Draw Winner</span>
+            <div class="winner-prize">${escapeHTML(formatMoney(draw.prize, draw.currency))}</div>
+            <p class="muted" style="margin:8px 0 20px;">Drawn fairly from ${draw.poolSize} eligible ${draw.poolSize === 1 ? 'entry' : 'entries'}</p>
+            <button class="btn primary lg" style="width:100%;" type="button" id="closeWinModalBtn">Awesome!</button>
+          </div>
+        `;
+        const close = () => { overlay.remove(); resolve(); };
+        overlay.querySelector('#closeWinModalBtn').addEventListener('click', close);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+        document.body.appendChild(overlay);
+      });
+    }
+
+    /* ==========================================================================
+       11. PARTICIPANTS MANAGEMENT
+       ========================================================================== */
+    function renderParticipantsTable() {
+      const c = getCampaign(selectedCampaignId);
+      if (!c) return;
+
+      const q = (document.getElementById('partSearchInput').value || '').trim().toLowerCase();
+      const filter = document.querySelector('#partFilterSeg button[aria-pressed="true"]')?.dataset.filter || 'all';
+
+      let sql = `
+        SELECT p.*,
+          (SELECT COUNT(*) FROM draws d WHERE d.participant_id = p.id) as wins,
+          (SELECT 1 FROM exclusions x WHERE x.participant_id = p.id AND x.campaign_id = p.campaign_id) as is_excluded
+        FROM participants p
+        WHERE p.campaign_id = ?
+      `;
+      const params = [c.id];
+      if (q) {
+        sql += ` AND (LOWER(p.identifier) LIKE ? OR LOWER(COALESCE(p.display_name, '')) LIKE ?)`;
+        params.push(`%${q}%`, `%${q}%`);
+      }
+      if (filter === 'eligible') {
+        sql += ` AND p.eligible = 1`;
+      } else if (filter === 'ineligible') {
+        sql += ` AND p.eligible = 0`;
+      }
+      sql += ` ORDER BY p.id DESC LIMIT 500`;
+
+      const rows = appDb.query(sql, params);
+      const tbody = document.getElementById('participantsTableBody');
+      if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty">No participants match your query.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rows.map(r => `
+        <tr data-id="${r.id}">
+          <td><input type="checkbox" class="part-row-check" value="${r.id}"></td>
+          <td><b>${escapeHTML(r.identifier)}</b> <span class="badge ${r.kind === 'email' ? 'violet' : ''}" style="height:18px;font-size:10px;">${r.kind}</span></td>
+          <td>${escapeHTML(r.display_name || '—')}</td>
+          <td>
+            ${r.is_excluded ? '<span class="badge red">Excluded</span>' :
+              r.eligible ? '<span class="badge green">Eligible</span>' : '<span class="badge">Ineligible</span>'}
+          </td>
+          <td><b style="color:var(--gold);">${r.wins}</b></td>
+          <td class="muted">${formatTimeAgo(r.created_at)}</td>
+          <td>
+            <div class="row" style="gap:6px;">
+              <button class="btn sm ghost toggle-elig-btn" data-id="${r.id}" data-cur="${r.eligible}">
+                ${r.eligible ? 'Disable' : 'Enable'}
+              </button>
+              <button class="btn sm danger del-part-btn" data-id="${r.id}">Delete</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+
+      // Wire row actions
+      tbody.querySelectorAll('.toggle-elig-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = Number(btn.dataset.id);
+          const next = btn.dataset.cur === '1' ? 0 : 1;
+          appDb.run("UPDATE participants SET eligible = ? WHERE id = ?", [next, id]);
+          renderParticipantsTable();
+        });
+      });
+
+      tbody.querySelectorAll('.del-part-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = Number(btn.dataset.id);
+          const hasWin = appDb.query("SELECT 1 FROM draws WHERE participant_id = ?", [id]).length > 0;
+          if (hasWin) {
+            showToast('Cannot delete a winner participant; needed for draw history.', 'error');
+            return;
+          }
+          appDb.run("DELETE FROM participants WHERE id = ?", [id]);
+          showToast('Participant deleted', 'success');
+          renderParticipantsTable();
+        });
+      });
+    }
+
+    function addParticipant(identifierRaw, displayNameRaw) {
+      const c = getCampaign(selectedCampaignId);
+      if (!c) return;
+      const parsed = parseIdentifier(identifierRaw);
+      if (!parsed) {
+        showToast('Please enter a UID or Gmail address', 'error');
+        return;
+      }
+      if (parsed.error) {
+        showToast(parsed.error, 'error');
+        return;
+      }
+
+      const existing = appDb.query("SELECT 1 FROM participants WHERE campaign_id = ? AND dedupe_key = ?", [c.id, parsed.dedupe_key]);
+      if (existing.length > 0) {
+        showToast('Participant already in this campaign', 'error');
+        return;
+      }
+
+      const displayName = displayNameRaw ? displayNameRaw.trim().slice(0, 60) : null;
+      appDb.run(`
+        INSERT INTO participants (campaign_id, identifier, dedupe_key, kind, display_name)
+        VALUES (?, ?, ?, ?, ?)
+      `, [c.id, parsed.identifier, parsed.dedupe_key, parsed.kind, displayName]);
+
+      showToast(`Added ${parsed.identifier}`, 'success');
+      renderParticipantsTable();
+    }
+
+    function bulkImportParticipants(rawText) {
+      const c = getCampaign(selectedCampaignId);
+      if (!c) return;
+      const tokens = String(rawText || '').split(/[\r\n,;\t]+/).map(s => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+      if (tokens.length === 0) {
+        showToast('No entries found to import', 'error');
+        return;
+      }
+
+      let added = 0;
+      let duplicates = 0;
+      let invalid = 0;
+      const seen = new Set();
+
+      tokens.forEach(raw => {
+        const parsed = parseIdentifier(raw);
+        if (!parsed || parsed.error) {
+          invalid++;
+          return;
+        }
+        if (seen.has(parsed.dedupe_key)) {
+          duplicates++;
+          return;
+        }
+        seen.add(parsed.dedupe_key);
+        try {
+          appDb.run(`
+            INSERT OR IGNORE INTO participants (campaign_id, identifier, dedupe_key, kind)
+            VALUES (?, ?, ?, ?)
+          `, [c.id, parsed.identifier, parsed.dedupe_key, parsed.kind]);
+          added++;
+        } catch (e) {
+          duplicates++;
+        }
+      });
+
+      showToast(`Import finished: ${added} added, ${duplicates} duplicates, ${invalid} invalid`, 'success');
+      renderParticipantsTable();
+    }
+
+    /* ==========================================================================
+       12. RULES & PRIZES PANEL
+       ========================================================================== */
+    function renderRulesPanel() {
+      const c = getCampaign(selectedCampaignId);
+      if (!c) return;
+
+      const form = document.getElementById('campaignRulesForm');
+      form.elements.name.value = c.name;
+      form.elements.currency.value = c.currency;
+      form.elements.minPrize.value = c.min_prize;
+      form.elements.maxPrize.value = c.max_prize;
+      form.elements.fixedPrize.value = c.fixed_prize;
+      form.elements.totalBudget.value = c.total_budget;
+      form.elements.maxPerPerson.value = c.max_per_person;
+      form.elements.maxWinners.value = c.max_winners;
+      form.elements.allowRepeatWinners.checked = Boolean(c.allow_repeat_winners);
+      form.elements.maskPublic.checked = Boolean(c.mask_public);
+      form.elements.isActive.checked = c.status === 'active';
+
+      try {
+        const list = JSON.parse(c.prize_list || '[]');
+        form.elements.prizeList.value = list.join('\n');
+      } catch (e) {
+        form.elements.prizeList.value = '';
+      }
+
+      setPrizeModeUI(c.prize_mode);
+    }
+
+    function setPrizeModeUI(mode) {
+      document.querySelectorAll('#prizeModeSeg button').forEach(b => {
+        b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
+      });
+      document.getElementById('prizeGroupRandom').hidden = mode !== 'random';
+      document.getElementById('prizeGroupFixed').hidden = mode !== 'fixed';
+      document.getElementById('prizeGroupList').hidden = mode !== 'list';
+    }
+
+    function saveRulesForm() {
+      const c = getCampaign(selectedCampaignId);
+      if (!c) return;
+      const form = document.getElementById('campaignRulesForm');
+      const name = form.elements.name.value.trim();
+      const currency = form.elements.currency.value.trim() || '$';
+      const mode = document.querySelector('#prizeModeSeg button[aria-pressed="true"]')?.dataset.mode || 'random';
+      const minPrize = Math.max(0, parseInt(form.elements.minPrize.value, 10) || 0);
+      const maxPrize = Math.max(minPrize, parseInt(form.elements.maxPrize.value, 10) || minPrize);
+      const fixedPrize = Math.max(0, parseInt(form.elements.fixedPrize.value, 10) || 0);
+      const totalBudget = Math.max(0, parseInt(form.elements.totalBudget.value, 10) || 0);
+      const maxPerPerson = Math.max(0, parseInt(form.elements.maxPerPerson.value, 10) || 0);
+      const maxWinners = Math.max(0, parseInt(form.elements.maxWinners.value, 10) || 0);
+      const allowRepeatWinners = form.elements.allowRepeatWinners.checked ? 1 : 0;
+      const maskPublic = form.elements.maskPublic.checked ? 1 : 0;
+      const status = form.elements.isActive.checked ? 'active' : 'closed';
+
+      let prizeList = [];
+      if (mode === 'list') {
+        prizeList = form.elements.prizeList.value.split(/[\r\n,]+/)
+          .map(v => parseInt(v.trim(), 10)).filter(Number.isFinite);
+      }
+
+      appDb.run(`
+        UPDATE campaigns SET
+          name = ?, currency = ?, prize_mode = ?, min_prize = ?, max_prize = ?, fixed_prize = ?,
+          prize_list = ?, total_budget = ?, max_per_person = ?, max_winners = ?,
+          allow_repeat_winners = ?, mask_public = ?, status = ?
+        WHERE id = ?
+      `, [name, currency, mode, minPrize, maxPrize, fixedPrize, JSON.stringify(prizeList),
+          totalBudget, maxPerPerson, maxWinners, allowRepeatWinners, maskPublic, status, c.id]);
+
+      showToast('Settings saved successfully', 'success');
+      populateCampaignSelect();
+      renderAdminCampaignHeader();
+    }
+
+    /* ==========================================================================
+       13. HISTORY & CSV EXPORT
+       ========================================================================== */
+    function renderHistoryTable() {
+      const scope = document.querySelector('#historyScopeSeg button[aria-pressed="true"]')?.dataset.scope || 'campaign';
+      let sql = `
+        SELECT d.*, c.name as campaign_name
+        FROM draws d
+        JOIN campaigns c ON c.id = d.campaign_id
+      `;
+      const params = [];
+      if (scope === 'campaign' && selectedCampaignId) {
+        sql += ` WHERE d.campaign_id = ?`;
+        params.push(selectedCampaignId);
+      }
+      sql += ` ORDER BY d.id DESC LIMIT 500`;
+
+      const rows = appDb.query(sql, params);
+      const tbody = document.getElementById('historyTableBody');
+      if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty">No draw history found.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rows.map(r => `
+        <tr>
+          <td>#${r.id}</td>
+          <td><b>${escapeHTML(r.identifier)}</b></td>
+          <td style="color:var(--gold); font-weight:700;">${escapeHTML(formatMoney(r.prize, r.currency))}</td>
+          <td>${r.pool_size}</td>
+          <td>${escapeHTML(r.campaign_name)}</td>
+          <td class="muted">${escapeHTML(r.admin_username || 'host')}</td>
+          <td class="muted">${formatTimeAgo(r.created_at)}</td>
+          <td>
+            <button class="btn sm danger del-draw-btn" data-id="${r.id}">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+
+      tbody.querySelectorAll('.del-draw-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = Number(btn.dataset.id);
+          const ok = await confirmModal({
+            title: 'Delete Draw Result?',
+            message: `Deleting draw #${id} will return the prize amount to the budget and restore winner eligibility.`,
+            confirmText: 'Delete Draw',
+            danger: true
+          });
+          if (ok) {
+            appDb.run("DELETE FROM draws WHERE id = ?", [id]);
+            showToast(`Draw #${id} deleted`, 'success');
+            renderHistoryTable();
+          }
+        });
+      });
+    }
+
+    function exportHistoryCSV() {
+      const scope = document.querySelector('#historyScopeSeg button[aria-pressed="true"]')?.dataset.scope || 'campaign';
+      let sql = `SELECT d.*, c.name as campaign_name FROM draws d JOIN campaigns c ON c.id = d.campaign_id`;
+      const params = [];
+      if (scope === 'campaign' && selectedCampaignId) {
+        sql += ` WHERE d.campaign_id = ?`;
+        params.push(selectedCampaignId);
+      }
+      sql += ` ORDER BY d.id ASC`;
+
+      const rows = appDb.query(sql, params);
+      if (rows.length === 0) {
+        showToast('No records to export', 'error');
+        return;
+      }
+
+      const escCSV = (v) => {
+        const s = String(v ?? '');
+        return /^[=+\-@]/.test(s) ? `"'${s.replace(/"/g, '""')}"` : `"${s.replace(/"/g, '""')}"`;
+      };
+
+      const header = ['Draw_ID', 'Campaign', 'Winner', 'Prize', 'Currency', 'Pool_Size', 'Drawn_By', 'Timestamp'].map(escCSV).join(',');
+      const lines = rows.map(r => [
+        r.id, r.campaign_name, r.identifier, r.prize, r.currency, r.pool_size, r.admin_username || 'host', r.created_at
+      ].map(escCSV).join(','));
+
+      const csvContent = '\uFEFF' + [header, ...lines].join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `luckywheel-history-${Date.now()}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    /* ==========================================================================
+       14. EXCLUSIONS & AUDIT LOG
+       ========================================================================= */
+    function renderExclusionsPanel() {
+      const c = getCampaign(selectedCampaignId);
+      if (!c) return;
+
+      const exclusions = appDb.query(`
+        SELECT x.*, p.identifier
+        FROM exclusions x
+        JOIN participants p ON p.id = x.participant_id
+        WHERE x.campaign_id = ?
+        ORDER BY x.id DESC
+      `, [c.id]);
+
+      document.getElementById('exCount').textContent = exclusions.length;
+      const exTbody = document.getElementById('exclusionsTableBody');
+      if (exclusions.length === 0) {
+        exTbody.innerHTML = '<tr><td colspan="3" class="empty">No excluded participants.</td></tr>';
+      } else {
+        exTbody.innerHTML = exclusions.map(x => `
+          <tr>
+            <td><b>${escapeHTML(x.identifier)}</b></td>
+            <td>${escapeHTML(x.reason || 'No reason specified')}</td>
+            <td>
+              <button class="btn sm danger remove-ex-btn" data-id="${x.id}">Remove</button>
+            </td>
+          </tr>
+        `).join('');
+
+        exTbody.querySelectorAll('.remove-ex-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            appDb.run("DELETE FROM exclusions WHERE id = ?", [Number(btn.dataset.id)]);
+            showToast('Exclusion removed', 'success');
+            renderExclusionsPanel();
+          });
+        });
+      }
+
+      // Audit Log Table
+      const logs = appDb.query("SELECT * FROM audit_log ORDER BY id DESC LIMIT 50");
+      const auditTbody = document.getElementById('auditTableBody');
+      if (logs.length === 0) {
+        auditTbody.innerHTML = '<tr><td colspan="5" class="empty">No audit events logged yet.</td></tr>';
+      } else {
+        auditTbody.innerHTML = logs.map(l => `
+          <tr>
+            <td class="muted">${formatTimeAgo(l.created_at)}</td>
+            <td><b>${escapeHTML(l.admin_name || 'system')}</b></td>
+            <td><span class="badge ${l.action.includes('draw') ? 'green' : 'violet'}">${escapeHTML(l.action)}</span></td>
+            <td>#${l.campaign_id || '—'}</td>
+            <td class="faint" style="font-size:12px; max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+              ${escapeHTML(l.details || '—')}
+            </td>
+          </tr>
+        `).join('');
+      }
+    }
+
+    function addExclusions(textRaw, reasonRaw) {
+      const c = getCampaign(selectedCampaignId);
+      if (!c) return;
+      const tokens = String(textRaw || '').split(/[\r\n,;\t]+/).map(s => s.trim()).filter(Boolean);
+      if (tokens.length === 0) {
+        showToast('Please enter at least one UID or email to exclude', 'error');
+        return;
+      }
+
+      let count = 0;
+      tokens.forEach(raw => {
+        const parsed = parseIdentifier(raw);
+        if (!parsed) return;
+        const part = appDb.query("SELECT id FROM participants WHERE campaign_id = ? AND dedupe_key = ?", [c.id, parsed.dedupe_key]);
+        if (part.length > 0) {
+          try {
+            appDb.run(`
+              INSERT OR IGNORE INTO exclusions (campaign_id, participant_id, reason, admin_username)
+              VALUES (?, ?, ?, ?)
+            `, [c.id, part[0].id, reasonRaw || 'Excluded by host', currentAdmin ? currentAdmin.username : 'admin']);
+            count++;
+          } catch (e) {}
+        }
+      });
+
+      showToast(`Excluded ${count} participant(s)`, 'success');
+      renderExclusionsPanel();
+    }
+
+    /* ==========================================================================
+       15. DATABASE IMPORT/EXPORT & QUICK DEMO SEED
+       ========================================================================== */
+    function exportSQLiteFile() {
+      const binary = appDb.exportBinary();
+      const blob = new Blob([binary], { type: 'application/x-sqlite3' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `luckywheel-${Date.now()}.db`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('SQLite database downloaded', 'success');
+    }
+
+    async function importSQLiteFile(file) {
+      if (!file) return;
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const u8 = new Uint8Array(arrayBuffer);
+        await appDb.importBinary(u8);
+        showToast('Database imported successfully!', 'success');
+        await loadInitialState();
+        renderAdminConsole();
+      } catch (err) {
+        showToast('Failed to import database: ' + err.message, 'error');
+      }
+    }
+
+    function seedDemoParticipants() {
+      const c = getCampaign(selectedCampaignId);
+      if (!c) return;
+      const demoNames = [
+        ['VortexSniper', 'vortex@gmail.com'],
+        ['CyberGhost', 'cyber.ghost@gmail.com'],
+        ['DragonSlayer', 'dslayer99@gmail.com'],
+        ['LordSpecter', 'specter@gmail.com'],
+        ['NeonValkyrie', 'neon.valk@gmail.com'],
+        ['QuantumAce', 'quantum_ace@gmail.com'],
+        ['ShadowReaper', 'reaper_77@gmail.com'],
+        ['TitanForge', 'titanforge@gmail.com'],
+        ['BlazePhoenix', 'blaze.phoenix@gmail.com'],
+        ['ApexPredator', 'apex_pred@gmail.com'],
+        ['MidnightEcho', 'echo.mid@gmail.com'],
+        ['FrostByte', 'frost.byte@gmail.com'],
+        ['VenomStrike', 'venom_strike@gmail.com'],
+        ['ThunderHawk', 'thunderhawk@gmail.com'],
+        ['EclipseKnight', 'eclipse_k@gmail.com'],
+        ['HyperDrive', 'hyperdrive@gmail.com'],
+        ['ZeroGravity', 'zero_grav@gmail.com'],
+        ['SoulSeeker', 'soul_seeker@gmail.com'],
+        ['OmegaWolf', 'omega_wolf@gmail.com'],
+        ['ChronoTrigger', 'chrono@gmail.com']
+      ];
+
+      let added = 0;
+      demoNames.forEach(([name, email]) => {
+        const parsed = parseIdentifier(email);
+        if (parsed) {
+          const exist = appDb.query("SELECT 1 FROM participants WHERE campaign_id = ? AND dedupe_key = ?", [c.id, parsed.dedupe_key]);
+          if (exist.length === 0) {
+            appDb.run(`
+              INSERT INTO participants (campaign_id, identifier, dedupe_key, kind, display_name)
+              VALUES (?, ?, ?, 'email', ?)
+            `, [c.id, parsed.identifier, parsed.dedupe_key, name]);
+            added++;
+          }
+        }
+      });
+
+      showToast(`Added ${added} demo participants! Ready to spin.`, 'success');
+      renderParticipantsTable();
+      renderAdminDrawPanel();
+    }
+
+    /* ==========================================================================
+       16. EVENT LISTENERS SETUP
+       ========================================================================== */
+    function setupEventListeners() {
+      // Spin button on public page
+      document.getElementById('pubSpinBtn').addEventListener('click', spinPublicWheel);
+
+      // Spin button on admin draw panel
+      document.getElementById('adminSpinBtn').addEventListener('click', spinAdminWheel);
+
+      // Campaign selector change
+      document.getElementById('adminCampaignSelect').addEventListener('change', (e) => {
+        selectedCampaignId = Number(e.target.value);
+        renderAdminCampaignHeader();
+        renderAdminDrawPanel();
+        renderParticipantsTable();
+        renderRulesPanel();
+        renderHistoryTable();
+        renderExclusionsPanel();
+      });
+
+      // Jump to history from draw panel
+      document.getElementById('gotoHistoryBtn').addEventListener('click', () => {
+        document.querySelectorAll('#adminNav button').forEach(b => b.removeAttribute('aria-current'));
+        document.querySelector('#adminNav button[data-tab="history"]').setAttribute('aria-current', 'page');
+        switchAdminTab('history');
+      });
+
+      // Login form
+      document.getElementById('loginForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const username = e.target.username.value.trim();
+        const password = e.target.password.value;
+        const errEl = document.getElementById('loginError');
+
+        const rows = appDb.query("SELECT * FROM admins WHERE username = ? COLLATE NOCASE", [username]);
+        if (rows.length === 0 || rows[0].password !== password) {
+          errEl.textContent = 'Invalid username or password';
+          return;
+        }
+
+        errEl.textContent = '';
+        currentAdmin = { id: rows[0].id, username: rows[0].username, role: rows[0].role };
+        sessionStorage.setItem('luckywheel_admin', JSON.stringify(currentAdmin));
+        document.getElementById('adminSwitchBtn').textContent = 'Dashboard';
+        showToast('Signed in successfully', 'success');
+        showView('admin');
+      });
+
+      // Admin logout
+      document.getElementById('adminLogoutBtn').addEventListener('click', () => {
+        currentAdmin = null;
+        sessionStorage.removeItem('luckywheel_admin');
+        document.getElementById('adminSwitchBtn').textContent = 'Admin';
+        showToast('Signed out', 'success');
+        showView('public');
+      });
+
+      // Add Participant Form
+      document.getElementById('addPartForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        addParticipant(e.target.identifier.value, e.target.displayName.value);
+        e.target.identifier.value = '';
+        e.target.displayName.value = '';
+      });
+
+      // Bulk Participant Form
+      document.getElementById('bulkPartForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        bulkImportParticipants(e.target.text.value);
+        e.target.text.value = '';
+      });
+
+      // Bulk file upload input
+      document.getElementById('bulkFileInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          bulkImportParticipants(ev.target.result);
+          e.target.value = '';
+        };
+        reader.readAsText(file);
+      });
+
+      // Participants filter & search
+      document.getElementById('partSearchInput').addEventListener('input', renderParticipantsTable);
+      document.querySelectorAll('#partFilterSeg button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('#partFilterSeg button').forEach(b => b.removeAttribute('aria-pressed'));
+          btn.setAttribute('aria-pressed', 'true');
+          renderParticipantsTable();
+        });
+      });
+
+      // Participants select all checkbox
+      document.getElementById('partSelectAll').addEventListener('change', (e) => {
+        document.querySelectorAll('.part-row-check').forEach(cb => { cb.checked = e.target.checked; });
+      });
+
+      // Batch actions
+      document.getElementById('batchEligibleBtn').addEventListener('click', () => {
+        const ids = [...document.querySelectorAll('.part-row-check:checked')].map(cb => Number(cb.value));
+        if (ids.length === 0) return showToast('No participants selected', 'error');
+        ids.forEach(id => appDb.run("UPDATE participants SET eligible = 1 WHERE id = ?", [id]));
+        showToast(`Marked ${ids.length} as eligible`, 'success');
+        renderParticipantsTable();
+      });
+
+      document.getElementById('batchIneligibleBtn').addEventListener('click', () => {
+        const ids = [...document.querySelectorAll('.part-row-check:checked')].map(cb => Number(cb.value));
+        if (ids.length === 0) return showToast('No participants selected', 'error');
+        ids.forEach(id => appDb.run("UPDATE participants SET eligible = 0 WHERE id = ?", [id]));
+        showToast(`Marked ${ids.length} as ineligible`, 'success');
+        renderParticipantsTable();
+      });
+
+      document.getElementById('batchDeleteBtn').addEventListener('click', async () => {
+        const ids = [...document.querySelectorAll('.part-row-check:checked')].map(cb => Number(cb.value));
+        if (ids.length === 0) return showToast('No participants selected', 'error');
+        const ok = await confirmModal({
+          title: 'Delete Selected Participants?',
+          message: `Are you sure you want to delete ${ids.length} participant(s)? Past winners will be preserved.`,
+          confirmText: 'Delete',
+          danger: true
+        });
+        if (!ok) return;
+
+        let deleted = 0;
+        ids.forEach(id => {
+          const hasWin = appDb.query("SELECT 1 FROM draws WHERE participant_id = ?", [id]).length > 0;
+          if (!hasWin) {
+            appDb.run("DELETE FROM participants WHERE id = ?", [id]);
+            deleted++;
+          }
+        });
+        showToast(`Deleted ${deleted} participant(s)`, 'success');
+        renderParticipantsTable();
+      });
+
+      // Rules: Prize Mode toggle
+      document.querySelectorAll('#prizeModeSeg button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          setPrizeModeUI(btn.dataset.mode);
+        });
+      });
+
+      // Rules form submit
+      document.getElementById('campaignRulesForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        saveRulesForm();
+      });
+
+      // Set featured campaign button
+      document.getElementById('setFeaturedBtn').addEventListener('click', () => {
+        const c = getCampaign(selectedCampaignId);
+        if (!c) return;
+        appDb.run("UPDATE campaigns SET featured = 0");
+        appDb.run("UPDATE campaigns SET featured = 1 WHERE id = ?", [c.id]);
+        showToast(`Campaign "${c.name}" is now featured on the live page!`, 'success');
+        populateCampaignSelect();
+        renderAdminCampaignHeader();
+      });
+
+      // Delete Campaign
+      document.getElementById('deleteCampaignBtn').addEventListener('click', async () => {
+        const c = getCampaign(selectedCampaignId);
+        if (!c) return;
+        const drawsCount = appDb.query("SELECT COUNT(*) as c FROM draws WHERE campaign_id = ?", [c.id])[0].c;
+        if (drawsCount > 0) {
+          showToast('Cannot delete a campaign with draw records; set status to Closed instead.', 'error');
+          return;
+        }
+        const ok = await confirmModal({
+          title: 'Delete Campaign?',
+          message: `Are you sure you want to permanently delete "${c.name}"?`,
+          confirmText: 'Delete Campaign',
+          danger: true
+        });
+        if (ok) {
+          appDb.run("DELETE FROM campaigns WHERE id = ?", [c.id]);
+          showToast('Campaign deleted', 'success');
+          await loadInitialState();
+          renderAdminConsole();
+        }
+      });
+
+      // New Campaign Modal
+      const newCampModal = document.getElementById('newCampaignModal');
+      document.getElementById('newCampaignBtn').addEventListener('click', () => {
+        newCampModal.hidden = false;
+        document.getElementById('newCampNameInput').value = '';
+        document.getElementById('newCampNameInput').focus();
+      });
+      document.getElementById('closeNewCampModalBtn').addEventListener('click', () => {
+        newCampModal.hidden = true;
+      });
+      document.getElementById('newCampaignForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const name = document.getElementById('newCampNameInput').value.trim();
+        if (!name) return;
+        appDb.run("INSERT INTO campaigns (name, prize_mode, min_prize, max_prize) VALUES (?, 'random', 100, 1000)", [name]);
+        const newId = appDb.query("SELECT last_insert_rowid() as id")[0].id;
+        selectedCampaignId = newId;
+        newCampModal.hidden = true;
+        showToast(`Created campaign "${name}"`, 'success');
+        populateCampaignSelect();
+        renderAdminCampaignHeader();
+        renderAdminDrawPanel();
+      });
+
+      // History scope seg
+      document.querySelectorAll('#historyScopeSeg button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('#historyScopeSeg button').forEach(b => b.removeAttribute('aria-pressed'));
+          btn.setAttribute('aria-pressed', 'true');
+          renderHistoryTable();
+        });
+      });
+
+      // History CSV Export
+      document.getElementById('exportHistoryCsvBtn').addEventListener('click', exportHistoryCSV);
+
+      // Clear History
+      document.getElementById('clearHistoryBtn').addEventListener('click', async () => {
+        const c = getCampaign(selectedCampaignId);
+        if (!c) return;
+        const ok = await confirmModal({
+          title: 'Clear Campaign History?',
+          message: `Are you sure you want to clear all draw records for "${c.name}"? This will return prizes to budget and restore eligibility.`,
+          confirmText: 'Clear All Draws',
+          danger: true
+        });
+        if (ok) {
+          appDb.run("DELETE FROM draws WHERE campaign_id = ?", [c.id]);
+          showToast('Campaign history cleared', 'success');
+          renderHistoryTable();
+          renderAdminDrawPanel();
+        }
+      });
+
+      // Exclude Form
+      document.getElementById('excludeForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        addExclusions(e.target.text.value, e.target.reason.value);
+        e.target.text.value = '';
+        e.target.reason.value = '';
+      });
+
+      // Export / Import SQLite Database
+      document.getElementById('exportDbBtn').addEventListener('click', exportSQLiteFile);
+      document.getElementById('importDbInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) importSQLiteFile(file);
+      });
+
+      // Quick Demo Seed
+      document.getElementById('seedDemoDataBtn').addEventListener('click', seedDemoParticipants);
+
+      // Reset Database
+      document.getElementById('resetDbBtn').addEventListener('click', async () => {
+        const ok = await confirmModal({
+          title: 'Reset Local Database?',
+          message: 'This will reset all campaigns, participants, and draws to default state.',
+          confirmText: 'Reset Database',
+          danger: true
+        });
+        if (ok) {
+          await appDb.resetToDefault();
+          showToast('Database reset to defaults', 'success');
+          await loadInitialState();
+          renderAdminConsole();
+        }
+      });
+
+      // Change Password
+      document.getElementById('changePasswordForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const currentPw = e.target.current.value;
+        const newPw = e.target.next.value;
+        if (!currentAdmin) return;
+        const user = appDb.query("SELECT * FROM admins WHERE id = ?", [currentAdmin.id])[0];
+        if (!user || user.password !== currentPw) {
+          showToast('Current password is incorrect', 'error');
+          return;
+        }
+        if (newPw.length < 6) {
+          showToast('New password must be at least 6 characters', 'error');
+          return;
+        }
+        appDb.run("UPDATE admins SET password = ? WHERE id = ?", [newPw, currentAdmin.id]);
+        showToast('Password updated successfully', 'success');
+        e.target.reset();
+      });
+    }
+  </script>
+</body>
+</html>

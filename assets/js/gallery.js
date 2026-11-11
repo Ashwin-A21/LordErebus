@@ -40,7 +40,7 @@
 
   /* ---------------- build DOM ---------------- */
   function tileHTML(m, first) {
-    const chip = `<span class="chip"><i></i>${m.type === 'video' ? 'Clip · ' : ''}${m.label}</span>`;
+    const chip = `<span class="grain" aria-hidden="true"></span><span class="chip"><i></i>${m.type === 'video' ? 'Clip · ' : ''}${m.label}</span>`;
     if (m.type === 'uid') {
       return `<div class="gtile uidtile" data-wrap data-kind="uid" style="background-color:${m.color}">
         <img src="${m.src}" alt="" loading="lazy" decoding="async" draggable="false">

@@ -1,3 +1,8 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.vercel/
 api/config.php
 .DS_Store
 Thumbs.db

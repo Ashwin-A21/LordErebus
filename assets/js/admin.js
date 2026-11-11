@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const { toast, confirmDialog, esc, money, ago, setBusy } = window.LE;
-  const API = 'api/admin.php';
+  const API = '/api/admin';
   const $ = id => document.getElementById(id);
   let csrf = null;
   let S = null; // last admin state
@@ -328,7 +328,8 @@
     const f = e.target, btn = f.querySelector('button[type=submit]');
     setBusy(btn, true);
     try {
-      await api('change_password', { method: 'POST', body: { current: f.current.value, next: f.next.value } });
+      const r = await api('change_password', { method: 'POST', body: { current: f.current.value, next: f.next.value } });
+      if (r.csrf) csrf = r.csrf;
       f.reset(); toast('Password updated', 'success');
     } catch (ex) { toast(ex.message, 'error'); }
     finally { setBusy(btn, false); }

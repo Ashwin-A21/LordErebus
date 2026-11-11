@@ -1,5 +1,0 @@
-# Block direct web access to config and library files
-<FilesMatch "^(config|config\.sample|lib)\.php$">
-  Require all denied
-</FilesMatch>
-Options -Indexes

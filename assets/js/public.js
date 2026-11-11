@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const { Sound, Wheel, confetti, toast, esc, money, setBusy } = window.LE;
-  const API = 'api/public.php';
+  const API = '/api/public';
   const $ = id => document.getElementById(id);
 
   const sound = new Sound();

@@ -18,7 +18,8 @@ function intIn(v, min, max, label) {
 
 async function adminState(g) {
   const st = await one(`SELECT COUNT(*) total, SUM(disqualified = 0) eligible, SUM(disqualified = 1) dq,
-                               COUNT(DISTINCT ip) ips, SUM(created_at > ?) last_hour
+                               COUNT(DISTINCT ip) ips, SUM(created_at > ?) last_hour,
+                               SUM(disqualified = 1 AND dq_reason = 'shared_ip') review
                         FROM le_entries WHERE giveaway_id = ?`, [now() - 3600, g.id]);
   const shared = await one(`SELECT COUNT(*) ips, COALESCE(SUM(n), 0) entries FROM
                             (SELECT COUNT(*) n FROM le_entries WHERE giveaway_id = ? GROUP BY ip HAVING n > 1) t`, [g.id]);
@@ -95,6 +96,7 @@ module.exports = handler(async (req, res) => {
       }
       if (filter === 'winners') where.push('e.win_rank IS NOT NULL');
       if (filter === 'dq') where.push('e.disqualified = 1');
+      if (filter === 'review') where.push("e.disqualified = 1 AND e.dq_reason = 'shared_ip'");
       if (filter === 'shared_ip') where.push('ipc.n > 1');
       const from = `FROM le_entries e
         JOIN (SELECT ip, COUNT(*) n FROM le_entries WHERE giveaway_id = ? GROUP BY ip) ipc ON ipc.ip = e.ip
@@ -104,7 +106,7 @@ module.exports = handler(async (req, res) => {
       // Group same-IP entries together so multi-account players are easy to spot
       const order = filter === 'shared_ip' ? 'ipc.n DESC, e.ip, e.id DESC' : 'e.id DESC';
       const rows = await q(`SELECT e.id, e.game_uid, e.game_name, e.email, e.ip, e.user_agent, e.created_at,
-                                   e.disqualified, e.win_rank, e.prize, ipc.n AS ip_count
+                                   e.disqualified, e.dq_reason, e.win_rank, e.prize, ipc.n AS ip_count
                             ${from} ORDER BY ${order} LIMIT ${per} OFFSET ${(page - 1) * per}`, allArgs);
       return sendJson(res, 200, { ok: true, rows, total, page, pages: Math.max(1, Math.ceil(total / per)) });
     }
@@ -200,14 +202,32 @@ module.exports = handler(async (req, res) => {
       return sendJson(res, 200, r);
     }
 
+    case 'approve_entry': {
+      if (g.status === 'drawn') fail(409, 'Winners are already drawn, so approving now would not change the result.');
+      const r = await q("UPDATE le_entries SET disqualified = 0, dq_reason = 'approved' WHERE id = ? AND win_rank IS NULL", [Number(b.entry_id) || 0]);
+      if (!r.affectedRows) fail(404, 'Entry not found.');
+      return sendJson(res, 200, { ok: true });
+    }
+
+    case 'approve_all_review': {
+      if (g.status === 'drawn') fail(409, 'Winners are already drawn.');
+      const r = await q("UPDATE le_entries SET disqualified = 0, dq_reason = 'approved' WHERE giveaway_id = ? AND disqualified = 1 AND dq_reason = 'shared_ip'", [g.id]);
+      return sendJson(res, 200, { ok: true, approved: r.affectedRows });
+    }
+
     case 'toggle_dq':
     case 'delete_entry': {
       const id = Number(b.entry_id) || 0;
       const e = await one('SELECT win_rank FROM le_entries WHERE id = ?', [id]);
       if (!e) fail(404, 'Entry not found.');
       if (e.win_rank !== null) fail(409, 'This entry is a winner. Use "Replace" on the Draw tab instead.');
-      if (action === 'toggle_dq') await q('UPDATE le_entries SET disqualified = 1 - disqualified WHERE id = ?', [id]);
-      else await q('DELETE FROM le_entries WHERE id = ?', [id]);
+      if (action === 'toggle_dq') {
+        // Disqualify → reason 'manual'. Restore → 'approved' if it was auto-flagged, so it isn't flagged again.
+        await q(`UPDATE le_entries SET
+                   dq_reason = IF(disqualified = 1, IF(dq_reason = 'shared_ip', 'approved', NULL), 'manual'),
+                   disqualified = 1 - disqualified
+                 WHERE id = ?`, [id]);
+      } else await q('DELETE FROM le_entries WHERE id = ?', [id]);
       return sendJson(res, 200, { ok: true });
     }
 

@@ -39,9 +39,15 @@ module.exports = handler(async (req, res) => {
     let me = null;
     const uid = String(params.uid || '').replace(/\D/g, '');
     if (uid) {
-      const row = await one('SELECT win_rank, prize FROM le_entries WHERE giveaway_id = ? AND game_uid = ?', [g.id, uid]);
+      const row = await one('SELECT win_rank, prize, disqualified, dq_reason FROM le_entries WHERE giveaway_id = ? AND game_uid = ?', [g.id, uid]);
       me = row
-        ? { entered: true, won: row.win_rank !== null, rank: row.win_rank === null ? null : Number(row.win_rank), prize: row.prize === null ? null : Number(row.prize) }
+        ? {
+            entered: true,
+            won: row.win_rank !== null,
+            rank: row.win_rank === null ? null : Number(row.win_rank),
+            prize: row.prize === null ? null : Number(row.prize),
+            review: !!Number(row.disqualified) && row.dq_reason === 'shared_ip', // waiting for the host to approve
+          }
         : { entered: false };
     }
     return sendJson(res, 200, { ok: true, server_time: now(), giveaway: G.publicGiveaway(g), entries, winners, wheel, me });
@@ -77,19 +83,22 @@ module.exports = handler(async (req, res) => {
     if (await scalar('SELECT 1 FROM le_entries WHERE giveaway_id = ? AND email_norm = ?', [g.id, norm])) {
       fail(409, 'This Gmail is already used for an entry.', { fields: { email: 'Already used.' } });
     }
-    if (g.max_per_ip > 0) {
-      const n = Number(await scalar('SELECT COUNT(*) FROM le_entries WHERE giveaway_id = ? AND ip = ?', [g.id, ip]));
-      if (n >= g.max_per_ip) fail(429, 'Entry limit reached for your network/device.');
-    }
+    const sameIp = Number(await scalar('SELECT COUNT(*) FROM le_entries WHERE giveaway_id = ? AND ip = ?', [g.id, ip]));
+    if (g.max_per_ip > 0 && sameIp >= g.max_per_ip) fail(429, 'Entry limit reached for your network/device.');
+    // First entry from an IP counts. Later ones are saved but held back until the host approves them.
+    const review = sameIp > 0;
 
     try {
-      await q(`INSERT INTO le_entries (giveaway_id, game_uid, game_name, email, email_norm, ip, remote_addr, user_agent, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      await q(`INSERT INTO le_entries (giveaway_id, game_uid, game_name, email, email_norm, ip, remote_addr, user_agent, created_at, disqualified, dq_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [g.id, uid, name, email, norm, ip, String(req.headers['x-forwarded-for'] || '').slice(0, 45),
-         String(req.headers['user-agent'] || '').slice(0, 255), now()]);
+         String(req.headers['user-agent'] || '').slice(0, 255), now(), review ? 1 : 0, review ? 'shared_ip' : null]);
     } catch (e) {
       if (e.code === 'ER_DUP_ENTRY') fail(409, 'You are already entered in this giveaway.');
       throw e;
+    }
+    if (review) {
+      return sendJson(res, 200, { ok: true, review: true, message: 'Entry received. Another entry already came from your network, so the host will review this one before it counts.' });
     }
     return sendJson(res, 200, { ok: true, message: "You're in! Winners are announced on this page." });
   }

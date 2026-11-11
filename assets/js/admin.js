@@ -87,7 +87,8 @@
   function renderDraw() {
     const g = S.giveaway, st = S.stats, drawn = g.status === 'drawn';
     $('kEntries').textContent = st.total; $('kEligible').textContent = st.eligible;
-    $('kIps').textContent = st.ips; $('kShared').textContent = st.shared_ip_entries;
+    $('kReview').textContent = st.review; $('kShared').textContent = st.shared_ip_entries;
+    $('kReviewWrap').classList.toggle('warn', st.review > 0);
     $('kSharedWrap').classList.toggle('warn', st.shared_ip_entries > 0);
     $('stLastHour').textContent = st.last_hour ? '+' + st.last_hour + ' in the last hour' : '';
     $('stTitle').textContent = g.title;
@@ -220,6 +221,15 @@
   });
 
   $('kSharedWrap').addEventListener('click', () => { setFilter('shared_ip'); switchTab('entries'); });
+  $('kReviewWrap').addEventListener('click', () => { setFilter('review'); switchTab('entries'); });
+  $('approveAllBtn').addEventListener('click', async e => {
+    const ok = await confirmDialog({ title: 'Approve all flagged entries?', message: 'Every entry waiting for review goes into the draw. Only do this if you have checked they are different real players.', confirmText: 'Approve all' });
+    if (!ok) return;
+    setBusy(e.currentTarget, true);
+    try { const r = await api('approve_all_review', { method: 'POST' }); toast(r.approved + ' entries approved', 'success'); loadEntries(); refresh(); }
+    catch (ex) { toast(ex.message, 'error'); }
+    finally { setBusy(e.currentTarget, false); }
+  });
 
   // Click-to-copy
   document.addEventListener('click', e => {
@@ -241,7 +251,8 @@
     try { r = await api('entries', { params: { q: $('eSearch').value.trim(), filter: eFilter, page: ePage } }); }
     catch (e) { toast(e.message, 'error'); return; }
     const cur = S ? S.giveaway.currency : '₹';
-    $('eCount').textContent = `${r.total} ${r.total === 1 ? 'entry' : 'entries'}` + (eFilter === 'shared_ip' ? ' sharing an IP with another entry (grouped by IP)' : '');
+    $('eCount').textContent = `${r.total} ${r.total === 1 ? 'entry' : 'entries'}` + (eFilter === 'shared_ip' ? ' sharing an IP with another entry (grouped by IP)' : eFilter === 'review' ? ' waiting for your approval' : '');
+    $('reviewBar').hidden = !(eFilter === 'review' && r.total > 0);
     let lastIp = null;
     $('eList').innerHTML = r.rows.map(x => {
       const shared = Number(x.ip_count) > 1;
@@ -252,11 +263,16 @@
         <div class="main-line">
           <b>${esc(x.game_name)}</b>
           ${x.win_rank ? `<span class="badge gold">#${x.win_rank} · ${esc(money(x.prize, cur))}</span>` : ''}
-          ${x.disqualified == 1 ? '<span class="badge red">Disqualified</span>' : ''}
+          ${flagged(x) ? '<span class="badge warn">Same IP · needs review</span>'
+            : x.disqualified == 1 ? '<span class="badge red">Disqualified</span>'
+            : x.dq_reason === 'approved' ? '<span class="badge green">Approved</span>' : ''}
         </div>
         <div class="acts">
-          ${x.win_rank ? '' : `<button class="btn sm ghost" data-dq="${x.id}" type="button">${x.disqualified == 1 ? 'Restore' : 'Disqualify'}</button>
-          <button class="btn sm danger" data-del="${x.id}" type="button" aria-label="Delete entry">✕</button>`}
+          ${x.win_rank ? '' : flagged(x)
+            ? `<button class="btn sm primary" data-approve="${x.id}" type="button">Approve</button>
+               <button class="btn sm danger" data-del="${x.id}" type="button" aria-label="Delete entry">✕</button>`
+            : `<button class="btn sm ghost" data-dq="${x.id}" type="button">${x.disqualified == 1 ? 'Restore' : 'Disqualify'}</button>
+               <button class="btn sm danger" data-del="${x.id}" type="button" aria-label="Delete entry">✕</button>`}
         </div>
         <div class="meta">
           <span>UID <b class="mono copy" data-copy="${esc(x.game_uid)}">${esc(x.game_uid)}</b></span>
@@ -273,6 +289,8 @@
       : '';
   }
 
+  const flagged = x => x.disqualified == 1 && x.dq_reason === 'shared_ip';
+
   function deviceOf(ua) {
     if (!ua) return '';
     const os = /Android/i.test(ua) ? 'Android' : /iPhone|iPad/i.test(ua) ? 'iOS' : /Windows/i.test(ua) ? 'Windows' : /Mac OS/i.test(ua) ? 'Mac' : /Linux/i.test(ua) ? 'Linux' : 'Other';
@@ -284,6 +302,8 @@
   $('eList').addEventListener('click', async e => {
     const ip = e.target.closest('[data-ip]');
     if (ip) { $('eSearch').value = ip.dataset.ip; setFilter('all'); loadEntries(); return; }
+    const ap = e.target.closest('[data-approve]');
+    if (ap) { try { await api('approve_entry', { method: 'POST', body: { entry_id: Number(ap.dataset.approve) } }); toast('Approved: entry is in the draw', 'success'); loadEntries(); refresh(); } catch (ex) { toast(ex.message, 'error'); } return; }
     const dq = e.target.closest('[data-dq]');
     if (dq) { try { await api('toggle_dq', { method: 'POST', body: { entry_id: Number(dq.dataset.dq) } }); loadEntries(); refresh(); } catch (ex) { toast(ex.message, 'error'); } return; }
     const del = e.target.closest('[data-del]');

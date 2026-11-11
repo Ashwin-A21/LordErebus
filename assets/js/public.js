@@ -14,7 +14,6 @@
   let state = null;          // last state from server
   let clockOffset = 0;       // server_time - local time (seconds)
   let revealing = false;
-  let showFormAnyway = false;
   let myUid = '';
   try { myUid = localStorage.getItem('le_uid') || ''; } catch (e) {}
 
@@ -131,11 +130,15 @@
         <h3>You won${me.prize ? ' ' + esc(money(me.prize, g.currency)) : ''}!</h3>
         <p>Rank #${me.rank}. We'll contact you on your Gmail. Check your inbox and spam folder.</p>`;
       box.className = 'entry-state won';
-    } else if (me && me.entered && !showFormAnyway) {
+    } else if (me && me.entered && me.review && g.status !== 'drawn') {
+      html = `<div class="big-icon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+        <h3>Entry under review</h3>
+        <p>UID <b class="mono">${esc(myUid)}</b> is saved. Another entry already came from your network, so the host will check this one before it counts in the draw.</p>`;
+      box.className = 'entry-state review';
+    } else if (me && me.entered) {
       html = `<div class="big-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg></div>
         <h3>${g.status === 'drawn' ? 'Not this time' : "You're in!"}</h3>
-        <p>UID <b class="mono">${esc(myUid)}</b> is entered.${g.status === 'drawn' ? ' Better luck next giveaway!' : ' Keep this page open for the live draw.'}</p>
-        ${g.accepting ? '<button class="btn ghost sm" type="button" id="anotherBtn">Enter a different UID</button>' : ''}`;
+        <p>UID <b class="mono">${esc(myUid)}</b> is entered.${g.status === 'drawn' ? ' Better luck next giveaway!' : ' Keep this page open for the live draw.'}</p>`;
       box.className = 'entry-state';
     } else if (!g.accepting) {
       const done = g.status === 'drawn';
@@ -147,11 +150,7 @@
     }
     form.hidden = !!html;
     box.hidden = !html;
-    if (html) {
-      box.innerHTML = html;
-      const another = $('anotherBtn');
-      if (another) another.onclick = () => { showFormAnyway = true; renderEntryCard(); $('entryForm').game_uid.focus(); };
-    }
+    if (html) box.innerHTML = html;
   }
 
   /* ---------------- countdown ---------------- */
@@ -248,10 +247,9 @@
         return;
       }
       rememberUid(v.game_uid);
-      showFormAnyway = false;
       form.reset();
-      toast(data.message || "You're in!", 'success');
-      confetti(2200); sound.fanfare();
+      if (data.review) toast(data.message);
+      else { toast(data.message || "You're in!", 'success'); confetti(2200); sound.fanfare(); }
       await load();
     } catch (err) {
       $('formError').textContent = 'Network error. Check your connection and try again.';

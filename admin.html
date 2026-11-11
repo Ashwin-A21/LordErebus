@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Teko:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/app.css?v=2">
+  <link rel="stylesheet" href="assets/css/app.css?v=6">
   <style>
     body { background: radial-gradient(900px 600px at 0% -10%, rgba(255,31,61,.12), transparent 60%), var(--bg); }
     .admin-top { position: sticky; top: 0; z-index: 40; display: flex; align-items: center; gap: 10px; height: 60px; padding: 0 var(--gutter);
@@ -34,6 +34,7 @@
     .kpi { padding: 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); min-width: 0; }
     .kpi b { display: block; font-family: var(--display); font-size: 32px; line-height: 1; margin-top: 6px; }
     .kpi.warn b { color: var(--warn); }
+    .badge.warn { color: #ffd08a; border-color: rgba(255,181,71,.45); background: rgba(255,181,71,.12); }
     .card h2 { margin: 0; font-size: 17px; }
     .card .head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
     .status-hero { display: grid; gap: 14px; }
@@ -119,7 +120,7 @@
         <div class="kpis">
           <div class="kpi"><span class="eyebrow">Entries</span><b id="kEntries">0</b></div>
           <div class="kpi"><span class="eyebrow">Eligible</span><b id="kEligible">0</b></div>
-          <div class="kpi"><span class="eyebrow">Unique IPs</span><b id="kIps">0</b></div>
+          <div class="kpi" id="kReviewWrap" role="button" tabindex="0" title="Entries auto-flagged for sharing an IP" style="cursor:pointer;"><span class="eyebrow">Needs review</span><b id="kReview">0</b></div>
           <div class="kpi" id="kSharedWrap" role="button" tabindex="0" title="Show entries that share an IP" style="cursor:pointer;"><span class="eyebrow">Shared IP</span><b id="kShared">0</b></div>
         </div>
 
@@ -198,11 +199,16 @@
             <input class="input" id="eSearch" type="search" placeholder="Search UID, name, Gmail or IP…" enterkeyhint="search">
             <div class="seg" id="eFilter">
               <button type="button" data-f="all" aria-pressed="true">All</button>
+              <button type="button" data-f="review" aria-pressed="false">Needs review</button>
               <button type="button" data-f="shared_ip" aria-pressed="false">Shared IP</button>
               <button type="button" data-f="winners" aria-pressed="false">Winners</button>
               <button type="button" data-f="dq" aria-pressed="false">Disqualified</button>
             </div>
             <a class="btn sm" id="exportBtn" href="/api/admin?action=export">⬇ CSV</a>
+          </div>
+          <div class="row" id="reviewBar" hidden style="padding:12px 14px;border-radius:13px;background:rgba(255,181,71,.08);border:1px solid rgba(255,181,71,.35);">
+            <span style="flex:1;min-width:200px;font-size:14px;color:#ffd08a;">These entries came from an IP that had already entered, so they were held back automatically. Approve the real players to put them in the draw.</span>
+            <button class="btn sm" type="button" id="approveAllBtn">Approve all</button>
           </div>
           <p class="faint" id="eCount" style="margin:0;font-size:13px;"></p>
           <div class="elist" id="eList"></div>
@@ -233,6 +239,6 @@
   </div>
 
   <script src="assets/js/ui.js?v=2"></script>
-  <script src="assets/js/admin.js?v=2"></script>
+  <script src="assets/js/admin.js?v=3"></script>
 </body>
 </html>

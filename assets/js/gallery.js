@@ -12,12 +12,13 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const G = 'assets/gallery/';
+  const V = '?v=3'; // bump when media files are replaced, so browsers don't show cached old versions
   const UID = '1747454789';
 
   /* ---------------- media ---------------- */
-  const clip = (n, label) => ({ type: 'video', src: `${G}clip${n}.mp4`, wide: `${G}clip${n}-wide.mp4`, poster: `${G}clip${n}.jpg`, label, color: ['#2a0a12', '#1b0c2c', '#26100a'][n % 3] });
-  const pic = (n, label) => ({ type: 'image', src: `${G}char${n}.jpg`, label, color: '#1f0b14' });
-  const uidTile = { type: 'uid', src: `${G}char1.jpg`, label: 'Profile', color: '#2a0a12' };
+  const clip = (n, label) => ({ type: 'video', src: `${G}clip${n}.mp4${V}`, wide: `${G}clip${n}-wide.mp4${V}`, poster: `${G}clip${n}.jpg${V}`, label, color: ['#2a0a12', '#1b0c2c', '#26100a'][n % 3] });
+  const pic = (n, label) => ({ type: 'image', src: `${G}char${n}.jpg${V}`, label, color: '#1f0b14' });
+  const uidTile = { type: 'uid', src: `${G}char1.jpg${V}`, label: 'Profile', color: '#2a0a12' };
 
   const C = {}; for (let i = 1; i <= 9; i++) C[i] = clip(i, ['', 'Push', 'Drop', 'Scope', 'Flank', 'Rush', 'Clutch', 'Spray', 'Eagle', 'One-tap'][i]);
   const P = { 1: pic(1, 'Fit'), 2: pic(2, 'Emote'), 3: pic(3, 'Throne') };

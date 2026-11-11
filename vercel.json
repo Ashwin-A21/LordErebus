@@ -1,5 +1,4 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "api/*.js": { "maxDuration": 15 }
   },
@@ -17,8 +16,8 @@
       "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
     },
     {
-      "source": "/assets/(.*)\.(jpg|png|webp)",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }]
+      "source": "/assets/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400" }]
     }
   ],
   "redirects": [

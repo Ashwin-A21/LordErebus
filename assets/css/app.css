@@ -373,6 +373,8 @@ textarea.input { min-height: 100px; padding: 12px 15px; resize: vertical; }
 .profile-info h3 { margin: 0; font-size: clamp(48px, 12vw, 84px); text-transform: uppercase; }
 .profile-info h3 em { font-style: normal; color: var(--red); text-shadow: 0 0 30px var(--red-glow); }
 .pstats { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+.pstats { grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,1.75fr); }
+.pstats .rank-stat b { color: var(--gold); font-size: clamp(22px, 6.4vw, 30px); }
 .uid-box {
   display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 16px;
   background: linear-gradient(135deg, rgba(255,207,90,.12), rgba(255,31,61,.08)); border: 1px solid rgba(255,207,90,.4);

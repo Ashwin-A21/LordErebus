@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Teko:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/app.css?v=2">
+  <link rel="stylesheet" href="assets/css/app.css?v=3">
 </head>
 <body>
   <header class="topbar" id="topbar">
@@ -28,7 +28,8 @@
     <nav class="topnav" aria-label="Sections">
       <a href="#enter">Enter</a>
       <a href="#live">Live draw</a>
-      <a href="#how">How it works</a>
+      <a href="#gallery">Gallery</a>
+      <a href="#profile">Profile</a>
       <a href="#faq">FAQ</a>
     </nav>
     <button class="icon-btn" id="soundBtn" type="button" aria-pressed="true" aria-label="Toggle sound" title="Sound">
@@ -160,6 +161,57 @@
       </div>
     </section>
 
+    <!-- ============ PROFILE ============ -->
+    <section class="section" id="profile" style="padding-top:0;">
+      <div class="wrap profile-grid">
+        <div class="profile-art">
+          <span class="badge gold lvl">LV. 56</span>
+          <img src="assets/gallery/char3.jpg" alt="Lord Erebus in-game character" loading="lazy" width="600" height="800">
+        </div>
+        <div class="profile-info">
+          <span class="eyebrow">Your host</span>
+          <h3 class="display">Lord <em>Erebus</em></h3>
+          <p class="muted" style="margin:0;">Free Fire MAX player and creator. Giveaway redeem codes drop on YouTube first.</p>
+          <div class="pstats">
+            <div class="stat"><span class="eyebrow">Level</span><b>56</b></div>
+            <div class="stat"><span class="eyebrow">Likes</span><b>1,792</b></div>
+            <div class="stat"><span class="eyebrow">CS rank</span><b>Heroic</b></div>
+          </div>
+          <div class="uid-box">
+            <div>
+              <span class="eyebrow">Free Fire UID</span>
+              <div class="uid" id="hostUid">1747454789</div>
+            </div>
+            <span class="spacer"></span>
+            <button class="btn sm" type="button" id="copyUidBtn">Copy UID</button>
+          </div>
+          <div class="ingame-card"><img src="assets/gallery/profile-card.jpg" alt="Lord Erebus in-game profile card: Lv. 56, 1792 likes, UID 1747454789" loading="lazy" width="880" height="520"></div>
+          <div class="cta-row">
+            <a class="btn primary" href="https://www.youtube.com/@LordErebus-Official" target="_blank" rel="noopener">▶ YouTube: LordErebus-Official</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ GALLERY ============ -->
+    <section class="gallery" id="gallery" aria-label="Gallery of clips and fits">
+      <div class="wrap section-head" style="margin-bottom:28px;">
+        <span class="eyebrow">Gallery</span>
+        <h2 class="display">Clips <em style="font-style:normal;color:var(--red)">&amp;</em> fits</h2>
+        <p>Highlights from the battleground. Tap any card to watch it full size.</p>
+      </div>
+      <div class="gwall" id="gwall">
+        <div class="gstage" id="gstage">
+          <div class="gmark">
+            <p class="word" data-gword>Lord Erebus</p>
+            <p class="tag" data-gtag>Clips, clutches &amp; fits from the battleground. <a href="https://www.youtube.com/@LordErebus-Official" target="_blank" rel="noopener">YouTube ↗</a></p>
+          </div>
+          <div class="gview" id="gview"><div class="gtrack" id="gtrack"></div></div>
+        </div>
+      </div>
+      <p class="ghint">← Swipe the wall · tap any card →</p>
+    </section>
+
     <!-- ============ HOW IT WORKS ============ -->
     <section class="section" id="how" style="padding-top:0;">
       <div class="wrap">
@@ -205,7 +257,10 @@
     <a class="btn primary" href="#enter" id="stickyBtn">Enter now</a>
   </div>
 
-  <script src="assets/js/ui.js?v=2"></script>
-  <script src="assets/js/public.js?v=2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js" defer></script>
+  <script src="assets/js/ui.js?v=3"></script>
+  <script src="assets/js/public.js?v=3"></script>
+  <script src="assets/js/gallery.js?v=1" defer></script>
 </body>
 </html>

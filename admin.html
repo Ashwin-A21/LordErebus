@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Admin — Lord Erebus Giveaway</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#07070a">
+  <link rel="icon" type="image/jpeg" href="assets/logo.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Teko:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/app.css?v=2">
+  <style>
+    body { background: radial-gradient(900px 600px at 0% -10%, rgba(255,31,61,.12), transparent 60%), var(--bg); }
+    .admin-top { position: sticky; top: 0; z-index: 40; display: flex; align-items: center; gap: 10px; height: 60px; padding: 0 var(--gutter);
+      background: rgba(7,7,10,.85); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+    .admin-top .brand span { font-size: 22px; }
+    .admin-top .tag { font-size: 11px; letter-spacing: .14em; color: var(--muted); text-transform: uppercase; }
+    .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; justify-content: space-around;
+      padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); background: rgba(10,9,13,.95); border-top: 1px solid var(--line);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+    .tabs button { flex: 1; display: grid; justify-items: center; gap: 2px; padding: 7px 4px; border: 0; background: transparent; color: var(--faint);
+      font-size: 11px; font-weight: 600; cursor: pointer; border-radius: 10px; }
+    .tabs button svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .tabs button[aria-selected="true"] { color: var(--text); }
+    .tabs button[aria-selected="true"] svg { stroke: var(--red); filter: drop-shadow(0 0 8px var(--red-glow)); }
+    main.admin { padding: 18px var(--gutter) calc(96px + env(safe-area-inset-bottom)); max-width: 1180px; margin: 0 auto; display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+    .stack { grid-template-columns: minmax(0, 1fr); }
+    .kpi .eyebrow { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #schedBadge { white-space: normal; height: auto; min-height: 28px; padding: 5px 12px; line-height: 1.35; }
+    #schedInput { min-height: 46px; }
+    .kpis { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+    .kpi { padding: 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); min-width: 0; }
+    .kpi b { display: block; font-family: var(--display); font-size: 32px; line-height: 1; margin-top: 6px; }
+    .kpi.warn b { color: var(--warn); }
+    .card h2 { margin: 0; font-size: 17px; }
+    .card .head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+    .status-hero { display: grid; gap: 14px; }
+    .status-hero .big { font-family: var(--display); font-size: 40px; line-height: .95; margin: 0; }
+    .control-grid { display: grid; gap: 10px; }
+    .grid-2 { display: grid; gap: 12px; grid-template-columns: 1fr; }
+    .split-preview { padding: 12px 14px; border-radius: 12px; background: rgba(255,207,90,.06); border: 1px dashed rgba(255,207,90,.35); color: #f3dc9c; font-size: 14px; }
+    .elist { display: grid; gap: 8px; }
+    .erow { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 6px 12px; padding: 12px 14px; border-radius: 13px; background: rgba(0,0,0,.28); border: 1px solid var(--line); }
+    .erow.dq { opacity: .55; }
+    .erow.win { border-color: rgba(255,207,90,.45); background: rgba(255,207,90,.05); }
+    .erow .main-line { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; min-width: 0; }
+    .erow .main-line b { font-size: 15px; word-break: break-word; }
+    .erow .meta { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--muted); font-size: 13px; }
+    .erow .meta span { min-width: 0; word-break: break-all; }
+    .erow .acts { display: flex; gap: 6px; align-items: start; }
+    .ipchip { cursor: pointer; border: 0; font: inherit; }
+    .pager { display: flex; gap: 8px; align-items: center; justify-content: center; margin-top: 12px; }
+    .toolbar { display: grid; gap: 10px; }
+    .hist { display: grid; gap: 10px; }
+    .hist details { border-radius: 14px; background: var(--surface); border: 1px solid var(--line); padding: 0 16px; }
+    .hist summary { list-style: none; cursor: pointer; padding: 14px 0; display: grid; gap: 4px; }
+    .hist summary::-webkit-details-marker { display: none; }
+    .login-wrap { min-height: 100svh; display: grid; place-items: center; padding: 16px; }
+    .login-card { width: min(400px, 100%); padding: 30px 22px 24px; display: grid; gap: 14px; text-align: center; }
+    .login-card img { width: 84px; height: 84px; border-radius: 50%; margin: 0 auto; object-fit: cover; border: 2px solid var(--red); box-shadow: 0 0 34px var(--red-glow); }
+    .login-card h1 { margin: 4px 0 0; font-size: 42px; }
+    .login-card h1 em { font-style: normal; color: var(--red); }
+    .copy { cursor: pointer; border-bottom: 1px dotted var(--faint); }
+    @media (min-width: 720px) {
+      .kpis { grid-template-columns: repeat(4, minmax(0,1fr)); }
+      .grid-2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .control-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .toolbar { grid-template-columns: minmax(0,1fr) auto auto; align-items: center; }
+    }
+    @media (min-width: 960px) {
+      .tabs { position: static; justify-content: flex-start; gap: 4px; max-width: 1180px; margin: 0 auto; padding: 14px var(--gutter) 0; background: none; border: 0; backdrop-filter: none; -webkit-backdrop-filter: none; }
+      .tabs button { flex: none; display: flex; gap: 8px; padding: 9px 14px; font-size: 14px; }
+      .tabs button svg { width: 18px; height: 18px; }
+      .tabs button[aria-selected="true"] { background: rgba(255,31,61,.12); }
+      main.admin { padding-bottom: 48px; }
+      .draw-layout { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 16px; align-items: start; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Login -->
+  <div class="login-wrap" id="loginView" hidden>
+    <form class="card login-card" id="loginForm" novalidate>
+      <img src="assets/logo.jpg" alt="">
+      <h1 class="display">LORD <em>EREBUS</em></h1>
+      <p class="muted" style="margin:0;">Giveaway admin</p>
+      <label class="field" style="text-align:left;">
+        <span>Password</span>
+        <input class="input" name="password" type="password" autocomplete="current-password" required autofocus>
+      </label>
+      <p class="form-error" id="loginError" role="alert" hidden></p>
+      <button class="btn primary lg block" type="submit" id="loginBtn">Sign in</button>
+      <a class="btn ghost sm" href="./">← Back to site</a>
+    </form>
+  </div>
+
+  <!-- App -->
+  <div id="appView" hidden>
+    <header class="admin-top">
+      <a class="brand" href="./" target="_blank" rel="noopener" title="Open live site">
+        <img class="brand-logo" src="assets/logo.jpg" alt="" width="34" height="34" style="width:34px;height:34px;">
+        <span>LORD <em>EREBUS</em></span>
+      </a>
+      <span class="tag" style="padding-top:3px;">Admin</span>
+      <span class="spacer"></span>
+    </header>
+    <nav class="tabs" id="tabs" role="tablist">
+        <button role="tab" data-tab="draw" aria-selected="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l6 4"/></svg>Draw</button>
+        <button role="tab" data-tab="entries" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg>Entries</button>
+        <button role="tab" data-tab="history" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>History</button>
+        <button role="tab" data-tab="settings" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button>
+    </nav>
+
+    <main class="admin">
+      <!-- ========== DRAW ========== -->
+      <section data-panel="draw" class="stack">
+        <div class="kpis">
+          <div class="kpi"><span class="eyebrow">Entries</span><b id="kEntries">0</b></div>
+          <div class="kpi"><span class="eyebrow">Eligible</span><b id="kEligible">0</b></div>
+          <div class="kpi"><span class="eyebrow">Unique IPs</span><b id="kIps">0</b></div>
+          <div class="kpi" id="kSharedWrap" role="button" tabindex="0" title="Show entries that share an IP" style="cursor:pointer;"><span class="eyebrow">Shared IP</span><b id="kShared">0</b></div>
+        </div>
+
+        <div class="draw-layout">
+          <div class="stack">
+            <div class="card pad status-hero">
+              <div class="row">
+                <span class="badge" id="stBadge">—</span>
+                <span class="spacer"></span>
+                <span class="faint" id="stLastHour" style="font-size:13px;"></span>
+              </div>
+              <p class="big" id="stTitle">—</p>
+              <p class="muted" id="stLine" style="margin:0;"></p>
+
+              <div class="control-grid" id="liveControls">
+                <button class="btn" id="toggleOpenBtn" type="button">Open entries</button>
+                <button class="btn primary" id="drawNowBtn" type="button">▶ Start draw now</button>
+              </div>
+
+              <div class="stack" id="scheduleBox" style="gap:8px;">
+                <span class="eyebrow">Schedule automatic draw</span>
+                <div class="row">
+                  <input class="input" type="datetime-local" id="schedInput" style="flex:1 1 200px;min-width:0;">
+                  <button class="btn" id="schedBtn" type="button">Schedule</button>
+                </div>
+                <div class="row" id="schedInfo" hidden>
+                  <span class="badge violet" id="schedBadge"></span>
+                  <button class="btn ghost sm" id="schedCancelBtn" type="button">Cancel schedule</button>
+                </div>
+                <p class="hint">Entries stay open until this time, then winners are drawn automatically and shown live on the site.</p>
+              </div>
+
+              <div id="finishedBox" hidden class="stack" style="gap:8px;">
+                <button class="btn primary" id="newGiveawayBtn" type="button">+ Start a new giveaway</button>
+                <p class="hint">Creates a fresh round with the same settings. Old entries and winners stay in History.</p>
+              </div>
+            </div>
+
+            <div class="card pad" id="winnersCard" hidden>
+              <div class="head"><h2>Winners</h2><span class="spacer"></span><span class="badge gold" id="winTotal"></span></div>
+              <div class="elist" id="winnersAdmin"></div>
+            </div>
+          </div>
+
+          <form class="card pad stack" id="configForm" novalidate>
+            <div class="head" style="margin:0;"><h2>Giveaway settings</h2><span class="spacer"></span><span class="badge" id="lockBadge" hidden>Locked after draw</span></div>
+            <label class="field"><span>Title (shown on the site)</span><input class="input" name="title" maxlength="120" required></label>
+            <label class="field"><span>Subtitle</span><input class="input" name="subtitle" maxlength="255"></label>
+            <div class="grid-2">
+              <label class="field"><span>Number of winners</span><input class="input lockable" name="winners_count" type="number" inputmode="numeric" min="1" max="1000" required></label>
+              <label class="field"><span>Total budget</span><input class="input lockable" name="budget" type="number" inputmode="numeric" min="0" required></label>
+            </div>
+            <div class="field">
+              <span>How to split the budget</span>
+              <div class="seg" id="splitSeg">
+                <button type="button" data-mode="equal" aria-pressed="true">Equal</button>
+                <button type="button" data-mode="random" aria-pressed="false">Random amounts</button>
+              </div>
+            </div>
+            <div class="grid-2">
+              <label class="field" id="minPrizeField"><span>Minimum per winner</span><input class="input lockable" name="min_prize" type="number" inputmode="numeric" min="0" value="0"></label>
+              <label class="field"><span>Currency symbol</span><input class="input lockable" name="currency" maxlength="8" value="₹"></label>
+            </div>
+            <div class="split-preview" id="splitPreview"></div>
+            <label class="field"><span>Max entries from one IP <em class="faint">(0 = no limit)</em></span><input class="input lockable" name="max_per_ip" type="number" inputmode="numeric" min="0" max="1000"><small class="hint">Mobile networks (Jio, Airtel) often share one IP between many real users, so a strict limit can block genuine players. Shared IPs are always flagged in Entries either way.</small></label>
+            <label class="switch"><input type="checkbox" name="unique_ip_winners" class="lockable"><span class="track"></span><span>Only one winner per IP address</span></label>
+            <button class="btn primary" type="submit" id="saveCfgBtn">Save settings</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- ========== ENTRIES ========== -->
+      <section data-panel="entries" class="stack" hidden>
+        <div class="card pad stack">
+          <div class="toolbar">
+            <input class="input" id="eSearch" type="search" placeholder="Search UID, name, Gmail or IP…" enterkeyhint="search">
+            <div class="seg" id="eFilter">
+              <button type="button" data-f="all" aria-pressed="true">All</button>
+              <button type="button" data-f="shared_ip" aria-pressed="false">Shared IP</button>
+              <button type="button" data-f="winners" aria-pressed="false">Winners</button>
+              <button type="button" data-f="dq" aria-pressed="false">Disqualified</button>
+            </div>
+            <a class="btn sm" id="exportBtn" href="api/admin.php?action=export">⬇ CSV</a>
+          </div>
+          <p class="faint" id="eCount" style="margin:0;font-size:13px;"></p>
+          <div class="elist" id="eList"></div>
+          <div class="pager" id="ePager"></div>
+        </div>
+      </section>
+
+      <!-- ========== HISTORY ========== -->
+      <section data-panel="history" class="stack" hidden>
+        <div class="hist" id="histList"></div>
+      </section>
+
+      <!-- ========== SETTINGS ========== -->
+      <section data-panel="settings" class="stack" hidden style="max-width:640px;">
+        <form class="card pad stack" id="pwForm" novalidate>
+          <h2>Change admin password</h2>
+          <p class="hint">Stored in the database as a secure hash (bcrypt) — never in plain text.</p>
+          <label class="field"><span>Current password</span><input class="input" type="password" name="current" autocomplete="current-password" required></label>
+          <label class="field"><span>New password <em class="faint">(8+ characters)</em></span><input class="input" type="password" name="next" autocomplete="new-password" minlength="8" required></label>
+          <button class="btn primary" type="submit">Update password</button>
+        </form>
+        <div class="card pad stack">
+          <h2>Session</h2>
+          <button class="btn danger" id="logoutBtn" type="button">Sign out</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="assets/js/ui.js?v=2"></script>
+  <script src="assets/js/admin.js?v=2"></script>
+</body>
+</html>
